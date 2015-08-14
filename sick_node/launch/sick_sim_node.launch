@@ -1,0 +1,31 @@
+<launch>
+	<node name="sick_node" pkg="sick_node" type="sick_node" output="screen" >
+		<param name="scan_in" value="/fmSensors/scan" />
+		<param name="pointcloud_out" value="/laserpointCloud" />
+		
+		<!-- TEST -->
+		<param name="out_left" value="/fmProcessing/laserpointCloudLeft" />
+		<param name="out_right" value="/fmProcessing/laserpointCloudRight" />
+	</node>
+  
+	<!--<node pkg="hough_line_detect" name="hough_line_detect_left" type="hough_detect_node" output="screen" >
+			<param name="in" value="/fmProcessing/laserpointCloudLeft" />
+			<param name="line_out" value="/fmProcessing/line_left"/>
+	</node>
+
+	<node pkg="hough_line_detect" name="hough_line_detect_right" type="hough_detect_node" output="screen" >
+			<param name="in" value="/fmProcessing/laserpointCloudRight" />
+			<param name="line_out" value="/fmProcessing/line_right"/>
+	</node>
+  
+	<node pkg="draw_marker_lines" name="draw_marker_lines_right" type="draw_marker_lines_node" output="screen" >
+			<param name="line_topic" value="/fmProcessing/line_right" />
+			<param name="draw_topic" value="/draw_line_right" />
+	</node>
+
+	<node pkg="draw_marker_lines" name="draw_marker_lines_left" type="draw_marker_lines_node" output="screen" >
+			<param name="line_topic" value="/fmProcessing/line_left" />
+			<param name="draw_topic" value="/draw_line_left" />
+	</node>-->
+</launch>
+
