@@ -26,4 +26,10 @@
 	<arg name="max_range" value="100.0" />
   </include>
 
+	<node pkg="velodyne_node" name="velodyne_node" type="velodyne_node" output="screen" >
+			<param name="ring" value="15" />
+			<param name="pointcloud_in" value="/velodyne_points" />
+			<param name="pointcloud_out" value="/velodyne_1d_cloud" />
+	</node>
+
 </launch>
