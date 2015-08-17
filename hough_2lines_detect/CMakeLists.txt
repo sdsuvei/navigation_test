@@ -87,16 +87,16 @@ include_directories(${EIGEN_INCLUDE_DIRS})
 # )
 
 ## Declare a cpp executable
-add_executable(hough_detect2_node src/hough_line_detect_node.cpp src/hough-transform.cpp)
+add_executable(hough_2lines_detect src/hough_line_detect_node.cpp src/hough-transform.cpp)
 
 add_definitions(${EIGEN_DEFINITIONS})
 
 ## Add cmake target dependencies of the executable/library
 ## as an example, message headers may need to be generated before nodes
- add_dependencies(hough_detect2_node hough_line_detect_generate_messages_cpp)
+ add_dependencies(hough_2lines_detect hough_line_detect_generate_messages_cpp)
 
 ## Specify libraries to link a library or executable target against
- target_link_libraries(hough_detect2_node
+ target_link_libraries(hough_2lines_detect
    ${catkin_LIBRARIES}
  )
 

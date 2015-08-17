@@ -18,7 +18,8 @@ public:
 
 	std::vector<std::vector<int> > img;
 	HoughTransform houghtransform;
-	ros::Publisher scan_pub_, line_pub_;
+
+	ros::Publisher scan_pub_, line_pub_, line_pub2_;;
 	ros::NodeHandle n;
 	ros::Subscriber cloud_sub;
 
@@ -26,73 +27,60 @@ public:
 	int y;
 
 
-	Transform(std::string pointCloudIn, std::string lineOut){
+
+	Transform(std::string pointCloudIn, std::string lineOut, std::string lineOut1){
 		//cloud_sub = n.subscribe(pointCloudIn, 5, &Transform::pointCallback, this); //subscribing to this same function
 		cloud_sub = n.subscribe(pointCloudIn, 5, &Transform::pointCallback2, this); //subscribing to this same function
 		line_pub_ = n.advertise<sick_node::hough_points>(lineOut, 10); //publishing the line
-		houghtransform.SetSize(180, 100);
+		line_pub2_ = n.advertise<sick_node::hough_points>(lineOut1, 10); //publishing the line
+		houghtransform.SetSize(2, 300);
 	}
 
 	void pointCallback2 (const sensor_msgs::PointCloud::ConstPtr & cloud_in){
-
-		Line result = houghtransform.Transform2(cloud_in);
-
-		//		hough_line_detect::line line;
-		//		line.header.seq++;
-		//		line.header.stamp = ros::Time::now();
-		//		line.header.frame_id = "/laser";
-
-//		pointcloudWline.header.seq++;
-//		pointcloudWline.header.stamp = ros::Time::now();
-//		pointcloudWline.header.frame_id = "/laser";
-//
-//		pointcloudWline.begin.x = ((float)result.x1-400)/100;
-//		pointcloudWline.begin.y = ((float)result.y1-400)/100;
-//
-//		pointcloudWline.end.x = ((float)result.x2-400)/100;
-//		pointcloudWline.end.y = ((float)result.y2-400)/100;
-//
-//		//scan_pub_.publish(cloud);
-//		line_pub_.publish(pointcloudWline);
-	}
-
-	void pointCallback (const sick_node::hough_points::ConstPtr& points_in){
 		sick_node::hough_points pointcloudWline;
-		sick_node::hough_point pointToCloud;
+		sick_node::hough_points pointcloudWline2;
 
-		for(int i = 0; i < points_in->points.size(); ++i){
-			if(!(points_in->points[i].x == 0 && points_in->points[i].y == 0)) {
-				x = (points_in->points[i].x)*100+400;
-				y = (points_in->points[i].y)*100+400;
-				img[x][y] = 1;
-			}
-			pointToCloud.x =  points_in->points[i].x;
-			pointToCloud.y =  points_in->points[i].y;
+		OutputLines result = houghtransform.Transform2(cloud_in);
 
-			pointcloudWline.points.push_back(pointToCloud);
-			//			pointcloudWline.points[i].x = points_in->points[i].x;
-			//			pointcloudWline.points[i].y = points_in->points[i].y;
-		}
-		Line result = houghtransform.Transform(img);
+				//hough_line_detect::line line;
+				//line.header.seq++;
+				//line.header.stamp = ros::Time::now();
+				//line.header.frame_id = "/laser";
+		
+		std::cout << "line1 : " << "\n";
+		result.line1.printVars();
 
-		//		hough_line_detect::line line;
-		//		line.header.seq++;
-		//		line.header.stamp = ros::Time::now();
-		//		line.header.frame_id = "/laser";
+		std::cout << "line2 : " <<  "\n";
+		result.line2.printVars();
 
 		pointcloudWline.header.seq++;
 		pointcloudWline.header.stamp = ros::Time::now();
 		pointcloudWline.header.frame_id = "/laser";
 
-		pointcloudWline.begin.x = ((float)result.x1-400)/100;
-		pointcloudWline.begin.y = ((float)result.y1-400)/100;
 
-		pointcloudWline.end.x = ((float)result.x2-400)/100;
-		pointcloudWline.end.y = ((float)result.y2-400)/100;
+		pointcloudWline.begin.x = ((float)result.line1.x1);
+		pointcloudWline.begin.y = ((float)result.line1.y1);
+
+		pointcloudWline.end.x = ((float)result.line1.x2);
+		pointcloudWline.end.y = ((float)result.line1.y2);
 
 		//scan_pub_.publish(cloud);
 		line_pub_.publish(pointcloudWline);
+
+		pointcloudWline2.header.seq++;
+		pointcloudWline2.header.stamp = ros::Time::now();
+		pointcloudWline2.header.frame_id = "/laser";
+
+		pointcloudWline2.begin.x = ((float)result.line2.x1);
+		pointcloudWline2.begin.y = ((float)result.line2.y1);
+
+		pointcloudWline2.end.x = ((float)result.line2.x2);
+		pointcloudWline2.end.y = ((float)result.line2.y2);
+
+		//scan_pub_.publish(cloud);
+		line_pub2_.publish(pointcloudWline2);
 	}
+
 };
 
 int main(int argc, char** argv){
@@ -104,15 +92,19 @@ int main(int argc, char** argv){
 	std::string in;
 	std::string line_out;
 
+	std::string line_out1;
+
 	int from_point = 0;
 	int to_point = 0;
 	ros::NodeHandle n("~");
 
 	//n.param<std::string>("in",in,"/fmProcessing/laserpointCloud");
-	n.param<std::string>("in",in,"/pointcloud_out");
-	n.param<std::string>("line_out", line_out,"/fmProcessing/2lines");
 
-	Transform transform(in, line_out);
+	n.param<std::string>("in",in,"/laserpointCloud");
+	n.param<std::string>("line_out", line_out,"/2lines");
+	n.param<std::string>("line_out1", line_out1,"/1lines");
+
+	Transform transform(in, line_out,line_out1);
 
 	transform.img.reserve(w);
 	for(int i = 0; i < w; ++i){

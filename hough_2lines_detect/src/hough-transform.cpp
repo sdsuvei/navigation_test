@@ -15,8 +15,9 @@ int y(int x){
 	return retval;
 }
 
-void HoughTransform::SetSize(int w, int h){
-	this->w = w;
+
+void HoughTransform::SetSize(int tres, int h){
+	this->w = 180/tres;
 	this->h = h;
 	hough_h = ((sqrt(2.0) * (double)(h>w?h:w)) / 2.0); //maximum height for the accumulator
 	_accu_h = hough_h * 2.0; // -r -> +r
@@ -31,75 +32,36 @@ HoughTransform::HoughTransform(){
 	max.t = 0;
 }
 
+OutputLines HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_in){
 
-Line HoughTransform::Transform(std::vector<std::vector<int> > & img){
-
-	   // int * accumulator = new int[180*_accu_h];
-	    std::vector<int> accumulator(180*_accu_h); // create an empty accumulator with 180 bins (because theta=[0,180])
-	    double x_center = w/2;
-	    double y_center = h/2;
-
-
-	max.current = 0;
-	max.t = 0;
-	max.r = 0;
-
-		for(int y = 0; y < h; y++){
-			for(int x = 0; x < w; x++){
-				if(img[x][y] == 1){
-					//count++;
-					for(int t = 0; t < 180; t++){
-						double r = ( ((double)x - x_center) * cos((double)t * DEG2RAD)) + (((double)y - y_center) * sin((double)t * DEG2RAD));
-						accumulator[ (int)((round(r + hough_h) * 180.0)) + t]++;
-					}
-				}
-				img[x][y] = 0;
-			}
-		}
-
-		//std::cout << "value of countz: " << count << "\n";
-
-
-
-		for(int t = 0; t < 180; t++){
-			for(int r = 0; r < _accu_h; r++){
-				if(max.current < accumulator[r*180+t]){
-					max.current = accumulator[r*180+t];
-					max.t = t;
-					max.r = r;
-				}
-			}
-		}
-
-		if(max.t >=45 && max.t <= 135){
-			//y = (r - x cos(t)) / sin(t);
-			x1 = 0;
-			y1 = ((double)(max.r -(_accu_h/2)) - ((x1 - (w/2) ) * cos(max.t * DEG2RAD))) / sin(max.t * DEG2RAD) + (h / 2);
-			x2 = w;
-			y2 = ((double)(max.r -(_accu_h/2)) - ((x2 - (w/2) ) * cos(max.t * DEG2RAD))) / sin(max.t * DEG2RAD) + (h / 2);
-		} else {
-			//x = (r - y sin(t)) / cos(t);
-			y1 = 0;
-			x1 = ((double)(max.r -(_accu_h/2)) - ((y1 - (h/2) ) * sin(max.t * DEG2RAD))) / cos(max.t * DEG2RAD) + (w / 2);
-			y2 = h;
-			x2 = ((double)(max.r -(_accu_h/2)) - ((y2 - (h/2) ) * sin(max.t * DEG2RAD))) / cos(max.t * DEG2RAD) + (w / 2);
-		}
-		Line line;
-		line.x1 = x1;
-		line.y1 = y1;
-		line.x2 = x2;
-		line.y2 = y2;
-		//line.printVars();
-		return line;
-}
-
-Line HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_in){
-
+	OutputLines returnVal;
+	if(w > 180)
+	{		
+		std::cout << "ERROR w is been set too big: " << w << ", decrease! w can max be 180." << std::endl;
+		returnVal.line1.x1 = -1;
+		returnVal.line1.y1 = -1;
+		returnVal.line1.x2 = -2;
+		returnVal.line1.y1 = -2;
+		returnVal.line2.x1 = -1;
+		returnVal.line2.y1 = -2;
+		returnVal.line2.x2 = -2;
+		returnVal.line2.y1 = -3;
+		return returnVal;
+	} else if(w < 1)
+	{
+		std::cout << "ERROR w is been set too small: " << w << ", increase! w can min be 1." << std::endl;
+		returnVal.line1.x1 = -1;
+		returnVal.line1.y1 = -1;
+		returnVal.line1.x2 = -2;
+		returnVal.line1.y1 = -2;
+		returnVal.line2.x1 = -1;
+		returnVal.line2.y1 = -2;
+		returnVal.line2.x2 = -2;
+		returnVal.line2.y1 = -3;
+		return returnVal;
+	}
+	
 	std::vector<std::vector<int> > houghMatrix(h, std::vector<int>(w));	 //initialisation of the Hugh Matrix
-	 // create an empty accumulator with 180 bins (because theta=[0,180])
-
-
-
 
 	//Hough Matrix Generation
 		for(int i = 0; i < cloud_in->points.size(); i++)//iterate through the data
@@ -109,21 +71,29 @@ Line HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_
 				//Using Center
 				//double r = ( ((double)x - x_center) * cos((double)t * DEG2RAD)) + (((double)y - y_center) * sin((double)t * DEG2RAD));
 				//Not using center
+
+				//intert requirements on the distance of the line.				
 				double r = ( ((double)cloud_in->points[i].x) * cos((double)t * DEG2RAD)) + (((double)cloud_in->points[i].y) * sin((double)t * DEG2RAD));
-				std::cout << "Is it 10o in first iteration ?: " << houghMatrix.size() << std::endl;
+				double distanceSquared = std::pow(cloud_in->points[i].x,2) + std::pow(cloud_in->points[i].y,2);
+				if(distanceSquared < 3) //&& cloud_in->points[i].x > 0 && cloud_in->points[i].y > 0)
+				{	
+					//std::cout << "Is it 10o in first iteration ?: " << houghMatrix.size() << std::endl;
 
-				double rtmp = r/RRESOLUTION/2;
-				if(std::abs(rtmp) <= h/2)
-				{
-//					std::cout<< "Resizing Matrix before: " << houghMatrix.size();
-//					houghMatrix.resize(houghMatrix.size()*2);// resize outer matrix
-//					std::cout<< houghMatrix.size() << std::endl;
+				
+					double rtmp = r/RRESOLUTION/2;
+					if(std::abs(rtmp) <= h/2)
+					{
+	//					std::cout<< "Resizing Matrix before: " << houghMatrix.size();
+	//					houghMatrix.resize(houghMatrix.size()*2);// resize outer matrix
+	//					std::cout<< houghMatrix.size() << std::endl;
 
-					//for (int i = 0; i < n; ++i)// resize inner matrix
-					//	houghMatrix[i].resize(m);
+						//for (int i = 0; i < n; ++i)// resize inner matrix
+						//	houghMatrix[i].resize(m);
 
-					//Increment Hough space
-					houghMatrix[std::floor<int>(rtmp)+std::floor<int>(h/2)][t]++;
+						//Increment Hough space
+						houghMatrix[std::floor<int>(rtmp)+std::floor<int>(h/2)][t]++;
+					}
+
 				}
 
 			}
@@ -146,6 +116,25 @@ Line HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_
 			}
 		}
 
+		
+		//Test Find the biggest angle
+		for(int t = 0; t < w; t++)
+		{
+			if(max.current < squaredValues[t]){
+				max.current = squaredValues[t];
+				max.t = t;
+			}
+		}	
+		max.current = 0;
+		for(int r = 0; r < h; r++)
+		{
+			if(max.current < houghMatrix[r][max.t]){
+				max.current = houghMatrix[r][max.t];
+				max.r_second = max.r;
+				max.r = r;
+			}
+		}
+
 		//Find lines
 //		while(parallelLinesFound)
 //		{
@@ -163,26 +152,48 @@ Line HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_
 //		}
 
 		//Output Generation
-		if(max.t >=45 && max.t <= 135){
+
+		//
+		//OBS!!!
+		//
+		//Assumes that 0 is along the x-axis when y is 0!!!
+		/*if((max.t >=45 && max.t <= 135) || (max.t >=225 && max.t <= 315)){
 			//y = (r - x cos(t)) / sin(t);
-			x1 = 0;
-			y1 = ((double)(max.r -(_accu_h/2)) - ((x1 - (w/2) ) * cos(max.t * DEG2RAD))) / sin(max.t * DEG2RAD) + (h / 2);
-			x2 = w;
-			y2 = ((double)(max.r -(_accu_h/2)) - ((x2 - (w/2) ) * cos(max.t * DEG2RAD))) / sin(max.t * DEG2RAD) + (h / 2);
-		} else {
+			x1 = 1;
+//(double)(max.r-(h/2))*RRESOLUTION
+			y1 = (2-x1*cos(max.t * DEG2RAD))/sin(max.t * DEG2RAD);
+			x2 = 10;
+			y2 = (2-x2*cos(max.t * DEG2RAD))/sin(max.t * DEG2RAD);
+		} else {*/
 			//x = (r - y sin(t)) / cos(t);
-			y1 = 0;
-			x1 = ((double)(max.r -(_accu_h/2)) - ((y1 - (h/2) ) * sin(max.t * DEG2RAD))) / cos(max.t * DEG2RAD) + (w / 2);
-			y2 = h;
-			x2 = ((double)(max.r -(_accu_h/2)) - ((y2 - (h/2) ) * sin(max.t * DEG2RAD))) / cos(max.t * DEG2RAD) + (w / 2);
-		}
+			std::cout << "Max.r = " << max.r << " Max.t = " << max.t << std::endl;
+			std::cout << "sin = " << sin((double)max.t * DEG2RAD) << " cos = " << cos((double)max.t * DEG2RAD) << std::endl;
+			y1 = -h*RRESOLUTION;
+			x1 = ((double)(max.r-(h/2))*RRESOLUTION - (double)y1  * sin((double)max.t * DEG2RAD)) / cos((double)max.t * DEG2RAD);
+			y2 = h*RRESOLUTION;
+			x2 = ((double)(max.r-(h/2))*RRESOLUTION - (double)y2  * sin((double)max.t * DEG2RAD)) / cos((double)max.t * DEG2RAD);
+
+
 		Line line;
 		line.x1 = x1;
 		line.y1 = y1;
 		line.x2 = x2;
 		line.y2 = y2;
-		//line.printVars();
-		return line;
+
+		returnVal.line1 = line;
+			y1 = -h*RRESOLUTION;
+			x1 = ((double)(max.r_second-(h/2))*RRESOLUTION - (double)y1  * sin((double)max.t * DEG2RAD)) / cos((double)max.t * DEG2RAD);
+			y2 = h*RRESOLUTION;
+			x2 = ((double)(max.r_second-(h/2))*RRESOLUTION - (double)y2  * sin((double)max.t * DEG2RAD)) / cos((double)max.t * DEG2RAD);
+		//}
+		line.x1 = x1;
+		line.y1 = y1;
+		line.x2 = x2;
+		line.y2 = y2;
+		returnVal.line2 = line;
+
+		return returnVal;
+
 }
 
 /*

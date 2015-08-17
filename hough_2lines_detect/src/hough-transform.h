@@ -10,9 +10,11 @@
 #define RRESOLUTION 0.05f
 
 struct Max {
-	int current;
-	int r;
-	int t;
+
+	double current;
+	double r;
+	double r_second;
+	double t;
 };
 
 struct Line {
@@ -22,10 +24,17 @@ struct Line {
 	int y2;
 
 	void printVars(){
-		std::cout << "x1: " << y1 <<  "\n";
-		std::cout << "21: " << y2 <<  "\n";
+
+		std::cout << "x's: " << x1 <<" and " << x2 <<  "\n";
+		std::cout << "y1: " << y1 << " and " << y2 << "\n";
 	}
 };
+struct OutputLines
+{
+	Line line1;
+	Line line2;
+};
+
 
 class HoughTransform {
 private:
@@ -41,7 +50,9 @@ private:
 public:
 	HoughTransform();
 	Line Transform(std::vector<std::vector<int> >&img);
-	Line Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_in);
+
+	OutputLines Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_in);
+
 	void SetSize(int w, int h);
 };
 
