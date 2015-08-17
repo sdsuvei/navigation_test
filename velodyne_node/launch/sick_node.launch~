@@ -1,0 +1,6 @@
+<launch>
+  <node name="sick_node" pkg="sick_node" type="sick_node" output="screen" >
+	<param name="SickPointcloud" value="/laserpointCloud" />
+  </node>
+</launch>
+

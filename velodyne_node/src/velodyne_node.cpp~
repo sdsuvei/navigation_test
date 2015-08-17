@@ -1,0 +1,100 @@
+
+
+#include <iostream>
+#include <sstream>
+#include <dirent.h>
+#include <pcl/point_types.h>
+#include <pcl/io/io.h>
+#include <pcl/visualization/cloud_viewer.h>
+#include <pcl/filters/filter.h>
+#include <pcl/features/normal_3d.h>
+#include <string>
+#include <math.h>
+
+#include <pcl/search/search.h>
+#include <pcl/search/kdtree.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl/segmentation/region_3d.h>
+#include <pcl/conversions.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <vector>
+#include <algorithm>
+#include <iterator>
+#include <pcl/segmentation/region_growing.h>
+#include <ros/ros.h>
+#include <rosbag/bag.h>
+#include <rosbag/view.h>
+#include <std_msgs/String.h>
+#include <std_msgs/Int32.h>
+#include <sensor_msgs/PointCloud2.h>
+
+boost::shared_ptr<pcl::visualization::PCLVisualizer> viewer;
+
+void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event, void* cookie)
+{
+	if (event.getKeySym () == "space" && event.keyDown ()) // Save annotation file
+	{
+		viewer->spinOnce();
+	}
+}
+
+ros::Publisher* pubProcessedPointCloudPointer;
+ros::Subscriber* subRawPointCloudPointer;
+ros::Publisher* pubOccupancyGridPointer;
+pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudIn(new pcl::PointCloud<pcl::PointXYZI>());
+int n;
+
+void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
+{
+	ROS_INFO("received point cloud");
+}
+
+int
+main (int argc, char** argv)
+{
+	ros::init(argc, argv, "velodyne_node");
+	ros::NodeHandle nh;
+
+
+	/*ros::Publisher pubProcessedPointCloud = nh.advertise<sensor_msgs::PointCloud2>
+	("/point_cloud_processed", 1);*/
+
+
+	ros::Subscriber subRawPointCloud = nh.subscribe<sensor_msgs::PointCloud2>
+	("/velodyne_points", 2, rawCloudHandler);
+	
+	/*
+	ros::Publisher pubOccupancyGrid = nh.advertise<nav_msgs::OccupancyGrid>
+	("/velodyne_evidence_grid", 1);
+
+	pubProcessedPointCloudPointer = &pubProcessedPointCloud;
+	subRawPointCloudPointer = &subRawPointCloud;
+	pubOccupancyGridPointer = &pubOccupancyGrid;
+
+	// Set up PCL Viewer
+	viewer.reset (new pcl::visualization::PCLVisualizer (argc, argv, "PointCloud"));
+	viewer->registerKeyboardCallback (keyboardEventOccurred);
+	//
+	//	// Create view ports
+	//	// 1 view port
+	viewer->createViewPort(0.0,0.0,1.0,1.0,v2);
+
+	// 2 view ports
+	//viewer->createViewPort(0.0,0.0,0.5,1.0,v1);
+	//viewer->createViewPort(0.5,0.0,1.0,1.0,v2);
+
+	// 4 view ports
+	//	viewer->createViewPort (0.0, 0.5, 0.5, 1.0, v1);
+	//	viewer->createViewPort (0.5, 0.5, 1.0, 1.0, v2);
+	//	viewer->createViewPort (0.0, 0.0, 0.5, 0.5, v3);
+	//	viewer->createViewPort (0.5, 0.0, 1.0, 0.5, v4);
+
+
+	viewer->addCoordinateSystem(1.0);
+
+	n = 0;
+	*/
+	ros::spin();
+
+	return (0);
+}
