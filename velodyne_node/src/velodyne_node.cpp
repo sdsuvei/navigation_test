@@ -94,6 +94,9 @@ void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 	cloud.channels.push_back(intensities);
 	cloud.channels.push_back(index);
 
+	cloud.header.frame_id = "/laser";
+	cloud.header.stamp = laserCloud->header.stamp;
+	cloud.header.seq = laserCloud->header.seq;
 
 	output_.publish(cloud);
 
@@ -116,7 +119,7 @@ main (int argc, char** argv)
 
 	nh.param<int>("ring", ring_no, 15); // the ring/laser to use [0...31]
 	nh.param<std::string>("pointcloud_in",pointcloud_in,"/velodyne_points");
-	nh.param<std::string>("pointcloud_out",pointcloud_out,"/velodyne_1d_cloud");
+	nh.param<std::string>("pointcloud_out",pointcloud_out,"/pointcloud_out");
 
 	ros::Subscriber subRawPointCloud = nh.subscribe<sensor_msgs::PointCloud2>
 	(pointcloud_in, 2, rawCloudHandler);
