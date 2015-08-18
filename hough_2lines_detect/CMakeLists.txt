@@ -11,11 +11,14 @@ find_package(catkin REQUIRED COMPONENTS
   laser_geometry
   message_generation
   geometry_msgs
+  cv_bridge
+  image_geometry
 )
 find_package(cmake_modules REQUIRED)
 
 find_package(Eigen REQUIRED)
 
+find_package(OpenCV)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -77,6 +80,7 @@ catkin_package(
 # include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 include_directories(${EIGEN_INCLUDE_DIRS})
@@ -98,6 +102,7 @@ add_definitions(${EIGEN_DEFINITIONS})
 ## Specify libraries to link a library or executable target against
  target_link_libraries(hough_2lines_detect
    ${catkin_LIBRARIES}
+   ${OpenCV_LIBRARIES}
  )
 
 #############
