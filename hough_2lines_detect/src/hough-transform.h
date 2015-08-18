@@ -33,10 +33,20 @@ struct Line {
 		std::cout << "point2 = (" << x2 <<" , " << y2 <<  ")\n";
 	}
 };
+//struct OutputLines
+//{
+//	Line line1;
+//	Line line2;
+//};
+
 struct OutputLines
 {
-	Line line1;
-	Line line2;
+        Line line1;
+        Line line2;
+        double theta;
+        double r1;
+        double r2;
+        double inliers;
 };
 
 
