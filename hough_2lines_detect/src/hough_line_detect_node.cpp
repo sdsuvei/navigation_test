@@ -28,13 +28,12 @@ public:
 
 
 
-	Transform(std::string pointCloudIn, std::string lineOut, std::string lineOut1){
-		//cloud_sub = n.subscribe(pointCloudIn, 5, &Transform::pointCallback, this); //subscribing to this same function
+	Transform(std::string pointCloudIn, std::string lineOut, std::string lineOut1, int angle_res, int height, double r_res, double min_row_distance,double max_point_distance){
 		hough_img_ = n.advertise<sensor_msgs::Image>("/hough_image", 10);
 		cloud_sub = n.subscribe(pointCloudIn, 5, &Transform::pointCallback2, this); //subscribing to this same function
 		line_pub_ = n.advertise<sick_node::hough_points>(lineOut, 10); //publishing the line
 		line_pub2_ = n.advertise<sick_node::hough_points>(lineOut1, 10); //publishing the line
-		houghtransform.SetSize(1, 100);
+		houghtransform.SetParams(angle_res, height, r_res, min_row_distance, max_point_distance);
 	}
 
 	void pointCallback2 (const sensor_msgs::PointCloud::ConstPtr & cloud_in){
@@ -92,6 +91,8 @@ int main(int argc, char** argv){
 
 	std::string in;
 	std::string line_out;
+	int height, angle_res;
+	double min_row_distance, max_point_distance, r_res;
 
 	std::string line_out1;
 
@@ -104,8 +105,13 @@ int main(int argc, char** argv){
 	n.param<std::string>("in",in,"/laserpointCloud");
 	n.param<std::string>("line_out", line_out,"/2lines");
 	n.param<std::string>("line_out1", line_out1,"/1lines");
+	n.param<int>("height",height,100);
+	n.param<int>("angle_res",angle_res,1);
+	n.param<double>("min_row_distance", min_row_distance,0.5);
+	n.param<double>("max_point_distance",max_point_distance,2.0);
+	n.param<double>("r_res",r_res,0.05f);
 
-	Transform transform(in, line_out,line_out1);
+	Transform transform(in, line_out,line_out1, angle_res, height, r_res, min_row_distance,max_point_distance);
 /*
 	transform.img.reserve(w);
 	for(int i = 0; i < w; ++i){

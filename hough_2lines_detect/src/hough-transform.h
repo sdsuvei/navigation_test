@@ -11,7 +11,7 @@
 #include "ros/ros.h"
 
 #define DEG2RAD .017453293f
-#define RRESOLUTION 0.05f
+//#define RRESOLUTION 0.05f
 
 struct Max {
 
@@ -51,11 +51,13 @@ private:
 		y2;
 	int h, w;
 	double tRes;
+	double min_row_distance;
+	double max_point_distance;
+	double RRESOLUTION;
 
 public:
 	HoughTransform();
-	//Line Transform(std::vector<std::vector<int> >&img);
 	OutputLines Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_in, ros::Publisher* hough_img_);
-	void SetSize(int w, int h);
+	void SetParams(int angle_res, int height, double r_res, double min_row_distance,double max_point_distance);
 };
 
