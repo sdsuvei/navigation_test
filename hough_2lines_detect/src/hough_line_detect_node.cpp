@@ -6,6 +6,7 @@
 #include "sick_node/hough_points.h"
 #include "hough-transform.h"
 #include <vector>
+#include <std_msgs/Float64MultiArray.h>
 
 
 /* optimize offset calculation (400 / depend on from_point -> to_point) */
@@ -22,17 +23,19 @@ public:
 	ros::Publisher scan_pub_, line_pub_, line_pub2_, hough_img_;
 	ros::NodeHandle n;
 	ros::Subscriber cloud_sub;
+	ros::Publisher array_pub;
 
 	int x;
 	int y;
 
 
 
-	Transform(std::string pointCloudIn, std::string lineOut, std::string lineOut1, int angle_res, int height, double r_res, double min_row_distance,double max_point_distance){
+	Transform(std::string pointCloudIn, std::string lineOut, std::string lineOut1, int angle_res, int height, double r_res, double min_row_distance,double max_point_distance, std::string dataOut){
 		hough_img_ = n.advertise<sensor_msgs::Image>("/hough_image", 10);
 		cloud_sub = n.subscribe(pointCloudIn, 5, &Transform::pointCallback2, this); //subscribing to this same function
 		line_pub_ = n.advertise<sick_node::hough_points>(lineOut, 10); //publishing the line
 		line_pub2_ = n.advertise<sick_node::hough_points>(lineOut1, 10); //publishing the line
+		array_pub = n.advertise<std_msgs::Float64MultiArray>(dataOut, 10);
 		houghtransform.SetParams(angle_res, height, r_res, min_row_distance, max_point_distance);
 	}
 
@@ -79,6 +82,17 @@ public:
 
 		//scan_pub_.publish(cloud);
 		line_pub2_.publish(pointcloudWline2);
+
+		std_msgs::Float64MultiArray HoughMsg;
+		HoughMsg.data.clear();
+
+		HoughMsg.data.push_back((float)result.theta);
+		HoughMsg.data.push_back((float)result.r1);
+		HoughMsg.data.push_back((float)result.r2);
+		HoughMsg.data.push_back((float)result.variance);
+
+		array_pub.publish(HoughMsg);
+
 	}
 
 };
@@ -102,6 +116,9 @@ int main(int argc, char** argv){
 
 	//n.param<std::string>("in",in,"/fmProcessing/laserpointCloud");
 
+	std::string measHough;
+	n.param<std::string>("measHough", measHough,"/measHough");
+
 	n.param<std::string>("in",in,"/laserpointCloud");
 	n.param<std::string>("line_out", line_out,"/2lines");
 	n.param<std::string>("line_out1", line_out1,"/1lines");
@@ -111,7 +128,7 @@ int main(int argc, char** argv){
 	n.param<double>("max_point_distance",max_point_distance,2.0);
 	n.param<double>("r_res",r_res,0.05f);
 
-	Transform transform(in, line_out,line_out1, angle_res, height, r_res, min_row_distance,max_point_distance);
+	Transform transform(in, line_out,line_out1, angle_res, height, r_res, min_row_distance,max_point_distance, measHough);
 /*
 	transform.img.reserve(w);
 	for(int i = 0; i < w; ++i){

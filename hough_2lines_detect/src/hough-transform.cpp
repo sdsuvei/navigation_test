@@ -202,6 +202,12 @@ OutputLines HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr &
 
 	returnVal.line2 = line;
 
+
+	returnVal.theta = 90-max.t*tRes;
+	returnVal.r1 = (double)(max.r-(double)std::floor<int>(h/2))*RRESOLUTION;
+	returnVal.r2 = (double)(max.r_second-(double)std::floor<int>(h/2))*RRESOLUTION;
+	returnVal.variance = (double)(houghMatrix[max.r][max.t]+houghMatrix[max.r_second][max.t])/((double)cloud_in->points.size());
+
 	return returnVal;
 }
 

@@ -46,7 +46,7 @@ struct OutputLines
         double theta;
         double r1;
         double r2;
-        double inliers;
+        double variance;
 };
 
 
