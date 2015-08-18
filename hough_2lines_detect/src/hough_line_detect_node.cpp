@@ -19,7 +19,7 @@ public:
 	std::vector<std::vector<int> > img;
 	HoughTransform houghtransform;
 
-	ros::Publisher scan_pub_, line_pub_, line_pub2_;;
+	ros::Publisher scan_pub_, line_pub_, line_pub2_, hough_img_;
 	ros::NodeHandle n;
 	ros::Subscriber cloud_sub;
 
@@ -30,17 +30,18 @@ public:
 
 	Transform(std::string pointCloudIn, std::string lineOut, std::string lineOut1){
 		//cloud_sub = n.subscribe(pointCloudIn, 5, &Transform::pointCallback, this); //subscribing to this same function
+		hough_img_ = n.advertise<sensor_msgs::Image>("/hough_image", 10);
 		cloud_sub = n.subscribe(pointCloudIn, 5, &Transform::pointCallback2, this); //subscribing to this same function
 		line_pub_ = n.advertise<sick_node::hough_points>(lineOut, 10); //publishing the line
 		line_pub2_ = n.advertise<sick_node::hough_points>(lineOut1, 10); //publishing the line
-		houghtransform.SetSize(1, 300);
+		houghtransform.SetSize(1, 100);
 	}
 
 	void pointCallback2 (const sensor_msgs::PointCloud::ConstPtr & cloud_in){
 		sick_node::hough_points pointcloudWline;
 		sick_node::hough_points pointcloudWline2;
 
-		OutputLines result = houghtransform.Transform2(cloud_in);
+		OutputLines result = houghtransform.Transform2(cloud_in, &hough_img_);
 
 				//hough_line_detect::line line;
 				//line.header.seq++;

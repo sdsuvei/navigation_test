@@ -5,6 +5,11 @@
 #include <vector>
 #include "sensor_msgs/PointCloud.h"
 
+#include "opencv2/core/core.hpp"
+#include <cv_bridge/cv_bridge.h>
+#include <sensor_msgs/image_encodings.h>
+#include "ros/ros.h"
+
 #define DEG2RAD .017453293f
 #define RRESOLUTION 0.05f
 
@@ -44,12 +49,13 @@ private:
 		x2,
 		y1,
 		y2;
-	int h, w, tRes;
+	int h, w;
+	double tRes;
 
 public:
 	HoughTransform();
 	//Line Transform(std::vector<std::vector<int> >&img);
-	OutputLines Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_in);
+	OutputLines Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_in, ros::Publisher* hough_img_);
 	void SetSize(int w, int h);
 };
 
