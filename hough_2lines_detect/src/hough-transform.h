@@ -5,7 +5,6 @@
 #include <vector>
 #include "sensor_msgs/PointCloud.h"
 
-
 #define DEG2RAD .017453293f
 #define RRESOLUTION 0.05f
 
@@ -25,8 +24,8 @@ struct Line {
 
 	void printVars(){
 
-		std::cout << "x's: " << x1 <<" and " << x2 <<  "\n";
-		std::cout << "y1: " << y1 << " and " << y2 << "\n";
+		std::cout << "point1 = (" << x1 <<" , " << y1 <<  ")\n";
+		std::cout << "point2 = (" << x2 <<" , " << y2 <<  ")\n";
 	}
 };
 struct OutputLines
@@ -45,14 +44,12 @@ private:
 		x2,
 		y1,
 		y2;
-	int h, w;
+	int h, w, tRes;
 
 public:
 	HoughTransform();
-	Line Transform(std::vector<std::vector<int> >&img);
-
+	//Line Transform(std::vector<std::vector<int> >&img);
 	OutputLines Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_in);
-
 	void SetSize(int w, int h);
 };
 

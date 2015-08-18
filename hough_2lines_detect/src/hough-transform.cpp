@@ -17,7 +17,8 @@ int y(int x){
 
 
 void HoughTransform::SetSize(int tres, int h){
-	this->w = 180/tres;
+	this->tRes = tres;
+	this->w = 180/tRes;
 	this->h = h;
 	hough_h = ((sqrt(2.0) * (double)(h>w?h:w)) / 2.0); //maximum height for the accumulator
 	_accu_h = hough_h * 2.0; // -r -> +r
@@ -35,29 +36,22 @@ HoughTransform::HoughTransform(){
 OutputLines HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_in){
 
 	OutputLines returnVal;
+	returnVal.line1.x1 = -1;
+	returnVal.line1.y1 = -1;
+	returnVal.line1.x2 = -2;
+	returnVal.line1.y1 = -2;
+	returnVal.line2.x1 = -1;
+	returnVal.line2.y1 = -2;
+	returnVal.line2.x2 = -2;
+	returnVal.line2.y1 = -3;
+
 	if(w > 180)
 	{		
 		std::cout << "ERROR w is been set too big: " << w << ", decrease! w can max be 180." << std::endl;
-		returnVal.line1.x1 = -1;
-		returnVal.line1.y1 = -1;
-		returnVal.line1.x2 = -2;
-		returnVal.line1.y1 = -2;
-		returnVal.line2.x1 = -1;
-		returnVal.line2.y1 = -2;
-		returnVal.line2.x2 = -2;
-		returnVal.line2.y1 = -3;
 		return returnVal;
 	} else if(w < 1)
 	{
 		std::cout << "ERROR w is been set too small: " << w << ", increase! w can min be 1." << std::endl;
-		returnVal.line1.x1 = -1;
-		returnVal.line1.y1 = -1;
-		returnVal.line1.x2 = -2;
-		returnVal.line1.y1 = -2;
-		returnVal.line2.x1 = -1;
-		returnVal.line2.y1 = -2;
-		returnVal.line2.x2 = -2;
-		returnVal.line2.y1 = -3;
 		return returnVal;
 	}
 	
@@ -75,17 +69,14 @@ OutputLines HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr &
 				//intert requirements on the distance of the line.				
 				double r = ( ((double)cloud_in->points[i].x) * cos((double)t * DEG2RAD)) + (((double)cloud_in->points[i].y) * sin((double)t * DEG2RAD));
 				double distanceSquared = std::pow(cloud_in->points[i].x,2) + std::pow(cloud_in->points[i].y,2);
-				if(distanceSquared < 3) //&& cloud_in->points[i].x > 0 && cloud_in->points[i].y > 0)
+				if(distanceSquared < 15) //&& cloud_in->points[i].x > 0 && cloud_in->points[i].y > 0)
 				{	
 					//std::cout << "Is it 10o in first iteration ?: " << houghMatrix.size() << std::endl;
-
-				
 					double rtmp = r/RRESOLUTION/2;
 					if(std::abs(rtmp) <= h/2)
 					{
 	//					std::cout<< "Resizing Matrix before: " << houghMatrix.size();
 	//					houghMatrix.resize(houghMatrix.size()*2);// resize outer matrix
-	//					std::cout<< houghMatrix.size() << std::endl;
 
 						//for (int i = 0; i < n; ++i)// resize inner matrix
 						//	houghMatrix[i].resize(m);
@@ -93,9 +84,7 @@ OutputLines HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr &
 						//Increment Hough space
 						houghMatrix[std::floor<int>(rtmp)+std::floor<int>(h/2)][t]++;
 					}
-
 				}
-
 			}
 		}
 
@@ -107,6 +96,10 @@ OutputLines HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr &
 		std::vector<int> DiscardedRs;
 		std::vector<int> squaredValues(w);
 		//iterate through Hough matrix to Find interesting Rows
+		for(int t = 0; t < w; t++)
+		{
+			squaredValues[t] = 0;
+		}
 
 		for(int r = 0; r < h; r++)
 		{
@@ -126,13 +119,35 @@ OutputLines HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr &
 			}
 		}	
 		max.current = 0;
+		max.r = 0;
+		max.r_second = 0;
+		bool linesFound = false;
+		std::vector<int> oldr;
 		for(int r = 0; r < h; r++)
 		{
 			if(max.current < houghMatrix[r][max.t]){
 				max.current = houghMatrix[r][max.t];
-				max.r_second = max.r;
+				
+				//Imposing that there has to be a certain distance between the rows.
+oldr.push_back(max.r);
+std::cout << "line distance = " << (((double)max.r-std::floor<int>(h/2))-((double)oldr.front()-std::floor<int>(h/2)))*RRESOLUTION << std::endl;
+std::cout << std::endl;
+				
 				max.r = r;
+				while((((double)max.r-std::floor<int>(h/2))-((double)oldr.front()-std::floor<int>(h/2)))*RRESOLUTION > 0.5 && oldr.size() > 0)
+				{
+					
+					max.r_second = oldr.front();
+    					oldr.erase(oldr.begin());
+	
+					linesFound = true;
+
+				}
+std::cout << "r = " << max.r << " and the second biggest: r_second = " << max.r_second << std::endl;
+			//ros::Duration(1).sleep();
+
 			}
+			
 		}
 
 		//Find lines
@@ -166,34 +181,38 @@ OutputLines HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr &
 			y2 = (2-x2*cos(max.t * DEG2RAD))/sin(max.t * DEG2RAD);
 		} else {*/
 			//x = (r - y sin(t)) / cos(t);
-			std::cout << "Max.r = " << max.r << " Max.t = " << max.t << std::endl;
+		if(linesFound)
+		{
+			std::cout<< "size of w = " << w << std::endl;
+			std::cout << "Max.r = " << max.r << " Max.t = " << max.t  << " Max.r_second = " << max.r_second << std::endl;
 			std::cout << "sin = " << sin((double)max.t * DEG2RAD) << " cos = " << cos((double)max.t * DEG2RAD) << std::endl;
+			//ros::Duration(0.5).sleep();
 			y1 = -h*RRESOLUTION;
-			x1 = ((double)(max.r-(h/2))*RRESOLUTION - (double)y1  * sin((double)max.t * DEG2RAD)) / cos((double)max.t * DEG2RAD);
+			x1 = ((double)(max.r-std::floor<int>(h/2))*RRESOLUTION - (double)y1  * sin((double)max.t*tRes * DEG2RAD)) / cos((double)max.t*tRes * DEG2RAD);
 			y2 = h*RRESOLUTION;
-			x2 = ((double)(max.r-(h/2))*RRESOLUTION - (double)y2  * sin((double)max.t * DEG2RAD)) / cos((double)max.t * DEG2RAD);
+			x2 = ((double)(max.r-std::floor<int>(h/2))*RRESOLUTION - (double)y2  * sin((double)max.t*tRes * DEG2RAD)) / cos((double)max.t*tRes * DEG2RAD);
 
+			Line line;
+			line.x1 = x1;
+			line.y1 = y1;
+			line.x2 = x2;
+			line.y2 = y2;
 
-		Line line;
-		line.x1 = x1;
-		line.y1 = y1;
-		line.x2 = x2;
-		line.y2 = y2;
-
-		returnVal.line1 = line;
+			returnVal.line1 = line;
 			y1 = -h*RRESOLUTION;
-			x1 = ((double)(max.r_second-(h/2))*RRESOLUTION - (double)y1  * sin((double)max.t * DEG2RAD)) / cos((double)max.t * DEG2RAD);
+			x1 = ((double)(max.r_second-std::floor<int>(h/2))*RRESOLUTION - (double)y1  * sin((double)max.t*tRes * DEG2RAD)) / cos((double)max.t*tRes * DEG2RAD);
 			y2 = h*RRESOLUTION;
-			x2 = ((double)(max.r_second-(h/2))*RRESOLUTION - (double)y2  * sin((double)max.t * DEG2RAD)) / cos((double)max.t * DEG2RAD);
-		//}
-		line.x1 = x1;
-		line.y1 = y1;
-		line.x2 = x2;
-		line.y2 = y2;
-		returnVal.line2 = line;
-
-		return returnVal;
-
+			x2 = ((double)(max.r_second-std::floor<int>(h/2))*RRESOLUTION - (double)y2  * sin((double)max.t*tRes * DEG2RAD)) / cos((double)max.t*tRes * DEG2RAD);
+			//}
+			line.x1 = x1;
+			line.y1 = y1;
+			line.x2 = x2;
+			line.y2 = y2;
+			returnVal.line2 = line;
+			//ros::Duration(0.5).sleep();
+			return returnVal;
+		}
+	return returnVal;
 }
 
 /*

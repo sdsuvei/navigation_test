@@ -33,7 +33,7 @@ public:
 		cloud_sub = n.subscribe(pointCloudIn, 5, &Transform::pointCallback2, this); //subscribing to this same function
 		line_pub_ = n.advertise<sick_node::hough_points>(lineOut, 10); //publishing the line
 		line_pub2_ = n.advertise<sick_node::hough_points>(lineOut1, 10); //publishing the line
-		houghtransform.SetSize(2, 300);
+		houghtransform.SetSize(1, 300);
 	}
 
 	void pointCallback2 (const sensor_msgs::PointCloud::ConstPtr & cloud_in){
@@ -85,8 +85,8 @@ public:
 
 int main(int argc, char** argv){
 
-	const int w = 800;
-	const int h = 800;
+	//const int w = 800;
+	//const int h = 800;
 	ros::init(argc, argv, "hough_2lines_detect");
 
 	std::string in;
@@ -105,12 +105,12 @@ int main(int argc, char** argv){
 	n.param<std::string>("line_out1", line_out1,"/1lines");
 
 	Transform transform(in, line_out,line_out1);
-
+/*
 	transform.img.reserve(w);
 	for(int i = 0; i < w; ++i){
 		std::vector<int> temp(h);
 		transform.img.push_back(temp);
-	}
+	}*/
 	ros::spin();
 	return 0;
 
