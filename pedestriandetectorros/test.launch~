@@ -1,8 +1,8 @@
 <launch>	
-	<!-- Makes pedestrian detector node -->
+	<!-- Makes pedestrian detector node. Change between the good and the bad detector by changing the model dir. -->
 	<node type="pedestrian_detector_node" name="ped" pkg="pedestrian_detector" respawn="true">
-		<param name="model_dir" value="$(find pedestrian_detector)/pedmodels/AcfInriaDetector.mat" />
-		<!--param name="model_dir" value="$(find pedestrian_detector)pedmodels/LdcfInriaDetector.mat" /-->
+		<!--param name="model_dir" value="$(find pedestrian_detector)/pedmodels/AcfInriaDetector.mat" /-->
+		<param name="model_dir" value="$(find pedestrian_detector)pedmodels/LdcfInriaDetector.mat" />
 		<param name="imageResize" value="0.5" />
 		<remap from="~image_raw" to="/image_raw" />
 	</node>

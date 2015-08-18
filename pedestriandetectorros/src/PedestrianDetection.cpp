@@ -102,8 +102,8 @@ public:
 		cinfor_ = boost::shared_ptr<camera_info_manager::CameraInfoManager>(
 				new camera_info_manager::CameraInfoManager(nh, "test", ""));
 
-		array_pub = nh.advertise<std_msgs::Float64MultiArray>("DistanceAngle", 10);
-		array_pub2 = nh.advertise<std_msgs::Float64MultiArray>("BBox", 10);
+		array_pub = nh.advertise<std_msgs::Float64MultiArray>("DistanceAngle", 1);
+		array_pub2 = nh.advertise<std_msgs::Float64MultiArray>("BBox", 1);
 		//cam_sub = it.subscribeCamera("image_raw", 1, &MyNode::onImage, this);
 		cam_sub = it.subscribeCamera("/usb_cam/image_raw", 1, &MyNode::onImage, this);
 		
