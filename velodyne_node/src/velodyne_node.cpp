@@ -115,11 +115,12 @@ int
 main (int argc, char** argv)
 {
 	ros::init(argc, argv, "velodyne_node");
-	ros::NodeHandle nh;
+	ros::NodeHandle nh("~");
 
 	nh.param<int>("ring", ring_no, 15); // the ring/laser to use [0...31]
-	nh.param<std::string>("pointcloud_in",pointcloud_in,"/velodyne_points");
+	nh.param<std::string>("pointcloud_in",pointcloud_in,"/velodyne_test");
 	nh.param<std::string>("pointcloud_out",pointcloud_out,"/pointcloud_out");
+
 
 	ros::Subscriber subRawPointCloud = nh.subscribe<sensor_msgs::PointCloud2>
 	(pointcloud_in, 2, rawCloudHandler);
