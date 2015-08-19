@@ -1,0 +1,188 @@
+/*
+ * NeighborhoodFeatures.h
+ *
+ *  Created on: Mar 3, 2015
+ *      Author: mikkel
+ */
+
+#ifndef PCL_ROS_SRC_NEIGHBORHOODFEATURES_H_
+#define PCL_ROS_SRC_NEIGHBORHOODFEATURES_H_
+
+#include <pcl/features/feature.h>
+#include <pcl/common/centroid.h>
+#include "pcl_ros.h"
+//#include <pcl/point_types.h>
+//#include <pcl/impl/instantiate.hpp>
+
+using namespace pcl;
+
+namespace pcl {
+
+template <typename PointInT, typename PointOutT>
+class NeighborhoodFeatures: public Feature<PointInT, PointOutT>
+{
+public:
+	typedef typename Feature<PointInT, PointOutT>::PointCloudOut PointCloudOut;
+
+	typedef boost::shared_ptr<NeighborhoodFeatures<PointInT, PointOutT> > Ptr;
+	typedef boost::shared_ptr<const NeighborhoodFeatures<PointInT, PointOutT> > ConstPtr;
+	using Feature<PointInT, PointOutT>::feature_name_;
+	using Feature<PointInT, PointOutT>::getClassName;
+	using Feature<PointInT, PointOutT>::indices_;
+	using Feature<PointInT, PointOutT>::k_;
+	using Feature<PointInT, PointOutT>::search_parameter_;
+	using Feature<PointInT, PointOutT>::surface_;
+	using Feature<PointInT, PointOutT>::input_;
+
+	/** \brief Empty constructor. */
+	NeighborhoodFeatures () : xyz_centroid_ (), temp_pt_ ()
+	{
+		feature_name_ = "NeighborhoodFeatures";
+	};
+
+	void
+	computePointMomentInvariants (
+			const pcl::PointCloud<PointInT> &cloud, int p_idx, const std::vector<int> &indices,
+			float &PCA1, float &PCA2, float &PCA3, float &normal_x, float &normal_y, float &normal_z, float &GPDistMean, float &GPDistMin, float &GPDistPoint, float &GPDistVar, float &PointDist, float &RSS, float &Reflectance)
+	{
+		//*** Distance ***//
+		PointDist = sqrt(cloud.points[p_idx].x*cloud.points[p_idx].x+cloud.points[p_idx].y*cloud.points[p_idx].y+cloud.points[p_idx].z*cloud.points[p_idx].z);
+		float radius = a*PointDist+b;
+
+		//*** PCA ***//
+
+		// Estimate the XYZ centroid
+		compute3DCentroid (cloud, indices, xyz_centroid_);
+
+		// Placeholder for the 3x3 covariance matrix at each surface patch
+		EIGEN_ALIGN16 Eigen::Matrix3f covariance_matrix;
+
+		// Compute the 3x3 covariance matrix
+		pcl::computeCovarianceMatrixNormalized (cloud, indices, xyz_centroid_, covariance_matrix);
+
+		// Extract the eigenvalues and eigenvectors
+		EIGEN_ALIGN16 Eigen::Vector3f eigen_values;
+		EIGEN_ALIGN16 Eigen::Matrix3f eigen_vectors;
+		pcl::eigen33 (covariance_matrix, eigen_vectors, eigen_values); // eigen values in ascending order
+
+		// Save eigenvector corresponding to the least eigenvalue
+		normal_x = eigen_vectors(0,0);
+		normal_y = eigen_vectors(1,0);
+		normal_z = fabs(eigen_vectors(2,0));
+
+		// Save eigenvalues in ascending order
+		float PCAsum = eigen_values[2];//eigen_values[0]+eigen_values[1]+eigen_values[2];
+		if (PCAsum > 0)
+		{
+			PCA1 = eigen_values[0]/PCAsum;
+			PCA2 = (eigen_values[1]-eigen_values[0])/PCAsum;
+			PCA3 = (eigen_values[2]-eigen_values[1])/PCAsum;
+		}
+		else
+		{
+			PCA1 = PCA2 = PCA3 = 0;
+		}
+		//*** Height features ***//
+		float zvar = 0;
+		float zmin = FLT_MAX;
+		//float imax = 0;
+		EIGEN_ALIGN16 Eigen::Vector3f nv = eigen_vectors.col(1);
+		EIGEN_ALIGN16 Eigen::Vector3f pm;
+		pm[0] = xyz_centroid_[0];
+		pm[1] = xyz_centroid_[1];
+		pm[2] = xyz_centroid_[2];
+		RSS = 0;
+		// Iterate over the nearest neighbors set
+		for (size_t nn_idx = 0; nn_idx < indices.size (); ++nn_idx)
+		{
+			// Demean the points
+			zvar += (cloud.points[indices[nn_idx]].z-xyz_centroid_[2])*(cloud.points[indices[nn_idx]].z-xyz_centroid_[2]);
+			float tmp = nv.dot(cloud.points[indices[nn_idx]].getVector3fMap()-pm);
+			RSS += tmp*tmp;//pow(nv.dot(cloud.points[indices[nn_idx]].getVector3fMap()-pm),2);
+			if (cloud.points[indices[nn_idx]].z < zmin)
+				zmin = cloud.points[indices[nn_idx]].z;
+//			if (cloud.points[p_idx].intensity > imax)
+//				imax = cloud.points[p_idx].intensity;
+		}
+
+		//
+		GPDistMean = xyz_centroid_[2];
+		GPDistMin = zmin;
+		GPDistPoint = cloud.points[p_idx].z;
+		GPDistVar = sqrt(zvar/indices.size())/radius;
+		RSS = RSS/indices.size();
+
+		Reflectance = cloud.points[p_idx].intensity;
+
+		//ROS_INFO("dist = %f -> %f, indices = %i",dist,a*dist+b,indices.size());
+
+	}
+
+protected:
+	void
+	computeFeature (PointCloudOut &output)
+	{
+		// Allocate enough space to hold the results
+		// \note This resize is irrelevant for a radiusSearch ().
+		std::vector<int> nn_indices (k_);
+		std::vector<float> nn_dists (k_);
+
+		output.is_dense = true;
+		// Save a few cycles by not checking every point for NaN/Inf values if the cloud is set to dense
+//		if (input_->is_dense)
+//		{
+			// Iterating over the entire index vector
+			for (size_t idx = 0; idx < indices_->size (); ++idx)
+			{
+				double dist = sqrt((*surface_).points[idx].x*(*surface_).points[idx].x+(*surface_).points[idx].y*(*surface_).points[idx].y+(*surface_).points[idx].z*(*surface_).points[idx].z);
+				search_parameter_ = a*dist+b;
+				//ROS_INFO("xyz_centroid_ = %f",xyz_centroid_[3]);
+				if (this->searchForNeighbors ((*indices_)[idx], search_parameter_, nn_indices, nn_dists) == 0)
+				{
+					output.points[idx].PCA1 = output.points[idx].PCA2 = output.points[idx].PCA3 = output.points[idx].PCANX = output.points[idx].PCANY = output.points[idx].PCANZ = output.points[idx].GPDistMean = output.points[idx].GPDistMin = output.points[idx].GPDistPoint = output.points[idx].GPDistVar = output.points[idx].PointDist = output.points[idx].RSS = output.points[idx].Reflectance = std::numeric_limits<float>::quiet_NaN ();
+					output.is_dense = false;
+					continue;
+				}
+
+				computePointMomentInvariants (*surface_, (*indices_)[idx], nn_indices,
+						output.points[idx].PCA1, output.points[idx].PCA2, output.points[idx].PCA3, output.points[idx].PCANX, output.points[idx].PCANY, output.points[idx].PCANZ, output.points[idx].GPDistMean, output.points[idx].GPDistMin, output.points[idx].GPDistPoint, output.points[idx].GPDistVar, output.points[idx].PointDist, output.points[idx].RSS, output.points[idx].Reflectance);
+			}
+//		}
+//		else
+//		{
+//			ROS_INFO("not dense");
+//			// Iterating over the entire index vector
+//			for (size_t idx = 0; idx < indices_->size (); ++idx)
+//			{
+//				double dist = sqrt((*surface_).points[idx].x*(*surface_).points[idx].x+(*surface_).points[idx].y*(*surface_).points[idx].y+(*surface_).points[idx].z*(*surface_).points[idx].z);
+//				search_parameter_ = a*dist+b;
+//				if (!isFinite ((*input_)[(*indices_)[idx]]) ||
+//						this->searchForNeighbors ((*indices_)[idx], search_parameter_, nn_indices, nn_dists) == 0)
+//				{
+//					output.points[idx].PCA1 = output.points[idx].PCA2 = output.points[idx].PCA3 = output.points[idx].PCANX = output.points[idx].PCANY = output.points[idx].PCANZ = output.points[idx].GPDistMean = output.points[idx].GPDistMin = output.points[idx].GPDistPoint = output.points[idx].GPDistVar = output.points[idx].PointDist = std::numeric_limits<float>::quiet_NaN ();
+//					output.is_dense = false;
+//					continue;
+//				}
+//
+//				computePointMomentInvariants (*surface_, (*indices_)[idx], nn_indices,
+//						output.points[idx].PCA1, output.points[idx].PCA2, output.points[idx].PCA3, output.points[idx].PCANX, output.points[idx].PCANY, output.points[idx].PCANZ, output.points[idx].GPDistMean, output.points[idx].GPDistMin, output.points[idx].GPDistPoint, output.points[idx].GPDistVar, output.points[idx].PointDist);
+//			}
+//		}
+	}
+
+private:
+	/** \brief 16-bytes aligned placeholder for the XYZ centroid of a surface patch. */
+	Eigen::Vector4f xyz_centroid_;
+
+	/** \brief Internal data vector. */
+	Eigen::Vector4f temp_pt_;
+
+	const double a = (rmax-rmin)/(rmaxdist-rmindist);
+	const double b = (rmin-a*rmindist);
+	//}
+};
+
+} /* namespace pcl */
+
+
+#endif /* PCL_ROS_SRC_NEIGHBORHOODFEATURES_H_ */
