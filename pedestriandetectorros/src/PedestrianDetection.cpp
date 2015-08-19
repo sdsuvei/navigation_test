@@ -156,8 +156,7 @@ public:
 
 		sensor_msgs::CameraInfoPtr cc(
 				new sensor_msgs::CameraInfo(cinfor_->getCameraInfo()));
-		sensor_msgs::ImagePtr msg_out = cv_bridge::CvImage(std_msgs::Header(),
-				"bgr8", img).toImageMsg();
+		sensor_msgs::ImagePtr msg_out = cv_bridge::CvImage(std_msgs::Header(),"bgr8", img).toImageMsg();
 		msg_out->header.stamp = ros::Time::now();
 
 		std_msgs::Float64MultiArray bbMsg;
