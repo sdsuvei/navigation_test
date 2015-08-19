@@ -1,3 +1,13 @@
+<!-- frobit launch file 
+
+FroboMind controller frobits using 22000/3300 ohm voltage dividers:
+	supply_voltage_scale_factor = 0.03747
+
+RoboCard based frobits using 1800/700 ohm voltage dividers: 
+	supply_voltage_scale_factor = 0.01746
+
+-->
+
 <launch>
 	<!--node name="sick_tim310s01" pkg="sick_tim" type="sick_tim310s01" respawn="false" output="screen">
 		<param name="min_ang" type="double" value="-2.35619449019" />
