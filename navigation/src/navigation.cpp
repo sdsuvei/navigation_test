@@ -90,7 +90,7 @@ Frobit::Frobit(){
         d_max = 4;
 
 	//subScan = n.subscribe("/fmSensors/scan", 1000, &Frobit::scanCallback, this);
-	sub_lines = n.subscribe("/measHoughKalman", 5, &Frobit::updateVel,this);
+	sub_lines = n.subscribe("/measHough", 5, &Frobit::updateVel,this);
 	twist_pub_ = n.advertise<geometry_msgs::TwistStamped>("/cmd_vel2", 1000);
 	deadman_pub_ = n.advertise<std_msgs::Bool>("/fmCommand/deadman", 1000);
 	error_pub_ = n.advertise<std_msgs::Float64>("/frobyte/error", 1000);
@@ -137,9 +137,14 @@ void Frobit::updateVel(const std_msgs::Float64MultiArray& houghInfo){
 	float front_dist_ = R/cos(phi);
 	
 	// change the velocity
-	twist.twist.linear.x = std::min(front_dist_/d_max, 1.0f)*v_max;	
+	twist.twist.linear.x = std::min((float)fabs(front_dist_/d_max), 1.0f)*v_max;	
+
+	std::cout << "theta: "<< theta <<  " and phi: = " << phi << std::endl;
+	std::cout << "err: "<< err_ << std::endl;
+	std::cout << "r1: "<< r1_ <<  " and r2: = " << r2_ << std::endl;
+	std::cout << "R: "<< R << std::endl;
 	std::cout << front_dist_ <<  " and division = " << front_dist_/d_max << std::endl;
-	twist.twist.linear.x = 0.2; //constant speed
+	//twist.twist.linear.x = 0.2; //constant speed
 	// send command to motors
 	twist_pub_.publish(twist);
 	//deadman_button.data = true;	
