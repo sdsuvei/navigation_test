@@ -11,7 +11,6 @@
 #include <msgs/nmea.h>
 #include <fstream>
 #include <math.h>
-#include <stdlib.h>
 #include <std_msgs/Float64MultiArray.h>
 
 #define M_PI2   2*M_PI

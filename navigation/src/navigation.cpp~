@@ -109,14 +109,14 @@ void Frobit::updateVel(const std_msgs::Float64MultiArray& houghInfo){
 		//if(angelTurned < 180){//related to IMU --- needs to be checked
 		//	twist.twist.angular.z = 1.0;
 		//} else {
-		//std::cout<<"HoughInfo:"<<houghInfo<<std::endl;
-		//std::cout<<"z_axis:"<<z_axis<<std::endl;
+		std::cout<<"HoughInfo:"<<houghInfo<<std::endl;
+		std::cout<<"z_axis:"<<z_axis<<std::endl;
 	        float r1_ = houghInfo.data[1];
 		float r2_ = houghInfo.data[2];
-		//std::cout<<"r1 = "<<r1_<< " and r2 = "<< r2_<<std::endl;
+		std::cout<<"r1 = "<<r1_<< " and r2 = "<< r2_<<std::endl;
 		float dist_ = r1_+r2_;  
 		float center_range = fabs(r1_)+fabs(r2_);  
-		//std::cout<<"dist = "<<dist_<< " and center = "<< center_range<<std::endl;
+		std::cout<<"dist = "<<dist_<< " and center = "<< center_range<<std::endl;
 bool temp;
 		if(fabs(dist_)>center_range/7)
 		{
@@ -131,8 +131,8 @@ temp = false;
 			stopCounter = 0;
 			followLeftWall = false;
 		}
-//std::cout<<"HoughInfo.data[0]:"<<houghInfo.data[0] << " is it the if case? " << temp<<std::endl;
-//std::cout << "The total dist is : " << fabs(dist_) << " > " << center_range/7 << "! Is it ? " << temp << std::endl;
+std::cout<<"HoughInfo.data[0]:"<<houghInfo.data[0] << " is it the if case? " << temp<<std::endl;
+std::cout << "The total dist is : " << fabs(dist_) << " > " << center_range/7 << "! Is it ? " << temp << std::endl;
 			
 		//}
 	//} else {
