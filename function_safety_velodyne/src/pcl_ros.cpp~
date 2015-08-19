@@ -1,0 +1,87 @@
+#include <iostream>
+#include <sstream>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/io/io.h>
+#include <pcl/visualization/cloud_viewer.h>
+#include <pcl/filters/filter.h>
+#include <pcl/features/normal_3d.h>
+
+#include <pcl/search/search.h>
+#include <pcl/search/kdtree.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl/segmentation/region_3d.h>
+#include <pcl/conversions.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <vector>
+#include <pcl/segmentation/region_growing.h>
+#include <rosbag/bag.h>
+#include <rosbag/view.h>
+#include <ros/ros.h>
+#include <std_msgs/String.h>
+#include <std_msgs/Int32.h>
+#include <sensor_msgs/PointCloud2.h>
+
+using namespace std;
+
+int
+  main (int argc, char** argv)
+{
+	ros::init(argc, argv, "pcl_ros");
+	ros::NodeHandle n;
+
+	std::string file = argv[1];
+
+	// Set up PCL Viewer
+	pcl::visualization::PCLVisualizer viewer("PointCloud");
+	viewer.setBackgroundColor (0, 0, 0);
+	viewer.addCoordinateSystem (1.0);
+	viewer.initCameraParameters();
+	viewer.setCameraPosition(-20,0,10,1,0,2,1,0,2,0);
+
+
+	rosbag::Bag bag;
+	//bag.open("/home/mikkel/Desktop/2014-10-27-10-08-04.bag", rosbag::bagmode::Read);
+	bag.open(file, rosbag::bagmode::Read);
+
+
+	std::string velodyne_info = "/velodyne_points";
+	std::vector<std::string> topics;
+	topics.push_back(velodyne_info);
+	rosbag::View view(bag, rosbag::TopicQuery(topics));
+
+	BOOST_FOREACH(rosbag::MessageInstance const m, view)
+	{
+		sensor_msgs::PointCloud2::ConstPtr msg = m.instantiate<sensor_msgs::PointCloud2>();
+		stringstream ss;
+		ss << msg->header.seq;
+		if (msg != NULL)
+		    	std::cout << ss.str().c_str() << std::endl;
+
+		pcl::PointCloud<pcl::PointXYZ> pc;
+	 	pcl::fromROSMsg(*msg, pc);
+
+		pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloudRGB(new pcl::PointCloud<pcl::PointXYZRGB>);
+		pcl::copyPointCloud(pc,*cloudRGB);
+		pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZRGB> single_color1(cloudRGB, 0, 0, 255);
+		viewer.removeAllPointClouds(0);
+		viewer.addPointCloud<pcl::PointXYZRGB>(cloudRGB,single_color1,"cloud");
+		viewer.setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "cloud");
+		if (!viewer.wasStopped())
+			viewer.spinOnce(1);
+		//pcl_sleep(1); 
+	}
+
+	bag.close();
+
+
+  /*pcl::PointCloud<pcl::PointXYZ>::Ptr cloud (new pcl::PointCloud<pcl::PointXYZ>);
+
+  if (pcl::io::loadPCDFile<pcl::PointXYZ> ("lidarFrame4.pcd", *cloud) == -1) //* load the file
+  {
+    PCL_ERROR ("Couldn't read file test_pcd.pcd \n");
+    return (-1);
+  }*/
+  
+  return (0);
+}

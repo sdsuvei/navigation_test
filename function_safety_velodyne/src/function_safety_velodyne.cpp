@@ -1,0 +1,208 @@
+//#define PCL_NO_PRECOMPILE
+
+#include <iostream>
+#include <sstream>
+#include <dirent.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/point_types.h>
+#include <pcl/io/io.h>
+#include <pcl/visualization/cloud_viewer.h>
+#include <pcl/filters/filter.h>
+#include <pcl/features/normal_3d.h>
+#include <string>
+#include <math.h>
+
+#include <pcl/search/search.h>
+#include <pcl/search/kdtree.h>
+#include <pcl/filters/passthrough.h>
+#include <pcl/segmentation/region_3d.h>
+#include <pcl/conversions.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <vector>
+#include <algorithm>
+#include <iterator>
+//#include <pcl/segmentation/region_growing.h>
+#include <ros/ros.h>
+#include <rosbag/bag.h>
+#include <rosbag/view.h>
+#include <std_msgs/String.h>
+#include <std_msgs/Int32.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <nav_msgs/OccupancyGrid.h>
+#include <pcl/filters/statistical_outlier_removal.h>
+#include <pcl/filters/grid_minimum.h>
+#include <pcl/segmentation/segment_differences.h>
+
+#include <pcl/surface/convex_hull.h>
+#include <pcl/segmentation/extract_polygonal_prism_data.h>
+#include <pcl/filters/extract_indices.h>
+
+#include <pcl/segmentation/sac_segmentation.h>
+#include <pcl/segmentation/extract_clusters.h>
+#include <pcl/sample_consensus/method_types.h>
+#include <pcl/sample_consensus/model_types.h>
+#include <pcl/sample_consensus/ransac.h>
+#include <pcl/filters/project_inliers.h>
+
+#include <pcl/features/moment_invariants.h>
+//#include "GlobalPlaneDistance.h"
+//#include "GroundEstimation.h"
+
+#include <pcl/common/transforms.h>
+#include <pcl/filters/random_sample.h>
+
+#include <pcl/octree/octree_impl.h>
+#include <pcl/octree/octree_iterator.h>
+#include <pcl/octree/octree_pointcloud_density.h>
+
+#include <opencv2/core/core.hpp>
+#include <opencv2/highgui/highgui.hpp>
+#include <opencv2/ml/ml.hpp>
+
+//#include "PrincipalComponentsAnalysis.h"
+//#include "nn_classification.h"
+#include "function_safety_velodyne.h"
+//#include "HelpingFunctions.h"
+//#include "NeighborhoodFeatures.h"
+
+//#include <pcl/segmentation/region_growing_rgb.h>
+//#include "region_growing2.h"
+//#include "region_growing.h"
+//#include "region_growing_rgb2.h"
+//#include <pcl/common/centroid.h>
+//#include <obstacle_detection/boundingbox.h>
+//#include <obstacle_detection/boundingboxes.h>
+#define PI 3.141592654
+
+using namespace std;
+using namespace cv;
+
+
+
+void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event, void* cookie)
+{
+	if (event.getKeySym () == "space" && event.keyDown ()) // Save annotation file
+	{
+		viewer->spinOnce();
+	}
+}
+
+ros::Publisher* pubProcessedPointCloudPointer;
+ros::Subscriber* subRawPointCloudPointer;
+ros::Publisher* pubOccupancyGridPointer;
+ros::Publisher* pubBBoxesPointer;
+pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudIn(new pcl::PointCloud<pcl::PointXYZI>());
+int n;
+
+void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
+{
+	ros::Time timestamp = laserCloud->header.stamp;
+	//bool returnBool;
+
+	viewer->removeAllPointClouds(0);
+
+	pcl::fromROSMsg(*laserCloud, *laserCloudIn);
+
+	double view_direction = PI;
+	double view_width=20.0f*PI/180.0f;
+	double distance_min = 0.8;
+	double distance_max = 1.0;
+	double angleH, angleV;
+	double distance;
+	pcl::PointXYZI point;
+	pcl::PointCloud<pcl::PointXYZI>::Ptr cloudStick(new pcl::PointCloud<pcl::PointXYZI>());
+	//laserCloudIn->points
+	std::vector<double> laserReturns;
+	for (size_t i=0;i<laserCloudIn->points.size();i++)
+	{
+		point = laserCloudIn->points[i];
+		angleH = atan2(point.y,point.x);
+		distance = sqrt(point.x*point.x+point.y*point.y);
+		angleV = roundf(atan(point.z/distance)*10000)/10000;
+
+		if ((angleH > view_direction-view_width/2) && (angleH < view_direction+view_width/2) && (distance > distance_min) && (distance < distance_max))
+		{
+			cloudStick->push_back(point);
+
+			if ( std::find(laserReturns.begin(), laserReturns.end(), angleV)!=laserReturns.end() )
+				;
+			else
+			{
+				laserReturns.push_back(angleV);
+			}
+
+			//ROS_INFO("angleH = %f, angleV = %f, distance = %f",angleH, angleV, distance);
+		}
+	}
+
+	//std::cout << laserReturns << std::endl;
+	//ROS_INFO("cloudStick size = %d",cloudStick->points.size());
+
+
+//	for (int i=0;i<laserReturns.size();i++)
+//	{
+//		ROS_INFO("angleV = %f",laserReturns[i]);
+//	}
+
+	ROS_INFO("laserReturns size = %d",laserReturns.size());
+
+	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> color1(laserCloudIn, 255, 255, 255);
+	viewer->addPointCloud<pcl::PointXYZI>(laserCloudIn,color1,"cloudRGB",viewP(RawCloud));
+
+	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZI> color2(cloudStick, 255, 255, 255);
+	viewer->addPointCloud<pcl::PointXYZI>(cloudStick,color2,"StickCloud",viewP(StickCloud));
+
+	viewer->spinOnce();
+}
+
+int
+main (int argc, char** argv)
+{
+	ros::init(argc, argv, "function_safety_velodyne");
+	ros::NodeHandle nh;
+
+
+	//ros::Publisher pubProcessedPointCloud = nh.advertise<sensor_msgs::PointCloud2>
+	//("/obstacle_detection/point_cloud_processed", 1);
+
+	ros::Subscriber subRawPointCloud = nh.subscribe<sensor_msgs::PointCloud2>
+	("/velodyne_points", 2, rawCloudHandler);
+
+	//ros::Publisher pubOccupancyGrid = nh.advertise<nav_msgs::OccupancyGrid>
+	//("/obstacle_detection/velodyne_evidence_grid", 1);
+
+	//ros::Publisher pubBBoxes = nh.advertise<obstacle_detection::boundingboxes>
+	//("/obstacle_detection/boundingboxes", 1);
+
+	/*pubProcessedPointCloudPointer = &pubProcessedPointCloud;
+	subRawPointCloudPointer = &subRawPointCloud;
+	pubOccupancyGridPointer = &pubOccupancyGrid;
+	pubBBoxesPointer = &pubBBoxes;*/
+
+	// Set up PCL Viewer
+	viewer.reset (new pcl::visualization::PCLVisualizer (argc, argv, "PointCloud2"));
+	viewer->registerKeyboardCallback (keyboardEventOccurred);
+	//
+	//	// Create view ports
+	//	// 1 view port
+	//viewer->createViewPort(0.0,0.0,1.0,1.0,v2);
+
+	// 2 view ports
+	viewer->createViewPort(0.0,0.0,0.5,1.0,v1);
+	viewer->createViewPort(0.5,0.0,1.0,1.0,v2);
+
+	// 4 view ports
+	/*viewer->createViewPort (0.0, 0.5, 0.5, 1.0, v1);
+		viewer->createViewPort (0.5, 0.5, 1.0, 1.0, v2);
+		viewer->createViewPort (0.0, 0.0, 0.5, 0.5, v3);
+		viewer->createViewPort (0.5, 0.0, 1.0, 0.5, v4);*/
+
+
+	viewer->addCoordinateSystem(1.0);
+
+	n = 0;
+
+	ros::spin();
+
+	return (0);
+}
