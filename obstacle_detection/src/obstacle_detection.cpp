@@ -32,7 +32,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <nav_msgs/OccupancyGrid.h>
 #include <pcl/filters/statistical_outlier_removal.h>
-#include <pcl/filters/grid_minimum.h>
+//#include <pcl/filters/grid_minimum.h>
 #include <pcl/segmentation/segment_differences.h>
 
 #include <pcl/surface/convex_hull.h>
@@ -203,10 +203,10 @@ void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 
 
 	// Grid Minimum
-	pcl::PointCloud<pcl::PointXYZI>::Ptr gridCloud(new pcl::PointCloud<pcl::PointXYZI>);
-	pcl::GridMinimum<pcl::PointXYZI> gridm(1.0); // Set grid resolution
-	gridm.setInputCloud(cloud_filtered);
-	gridm.filter(*gridCloud);
+//	pcl::PointCloud<pcl::PointXYZI>::Ptr gridCloud(new pcl::PointCloud<pcl::PointXYZI>);
+//	pcl::GridMinimum<pcl::PointXYZI> gridm(1.0); // Set grid resolution
+//	gridm.setInputCloud(cloud_filtered);
+//	gridm.filter(*gridCloud);
 
 	//*** Transform point cloud to adjust for a Ground Plane ***//
 	pcl::ModelCoefficients ground_coefficients;
@@ -216,7 +216,7 @@ void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 	ground_finder.setModelType(pcl::SACMODEL_PLANE);
 	ground_finder.setMethodType(pcl::SAC_RANSAC);
 	ground_finder.setDistanceThreshold(0.15);
-	ground_finder.setInputCloud(gridCloud);
+	ground_finder.setInputCloud(cloud_filtered);
 	ground_finder.segment(ground_indices, ground_coefficients);
 
 	// Convert plane normal vector from type ModelCoefficients to Vector4f
