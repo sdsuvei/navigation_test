@@ -8,6 +8,8 @@
 #ifndef PCL_ROS_SRC_PCL_ROS_H_
 #define PCL_ROS_SRC_PCL_ROS_H_
 
+#define WALL_CLEARANCE 0.1
+
 const int RawCloud = 1;
 const int PlaneOrthogonal = 2;
 const int PCAvalues = 3;
@@ -32,11 +34,12 @@ const int Reflectance = 22;
 const int GroundTruth = 23;
 const int Segments = 24;
 const int SegmentsFiltered = 25;
+const int LinesFiltered = 26;
 const int BLACK = 99;
 
 #define SHOW1 RawCloud
 #define SHOW2 Classification
-#define SHOW3 Segments
+#define SHOW3 LinesFiltered
 #define SHOW4 SegmentsFiltered
 
 #define training false
@@ -54,6 +57,7 @@ const std::string featureSelectionMethod = "forward"; // "backward"
 
 #define classifier svm // "knn"
 
+#define PI 3.141592654
 #define OCCUPANCY_GRID_RESOLUTION 0.2f // 10 cm
 #define OCCUPANCY_WIDTH_M 100.0f
 #define OCCUPANCY_DEPTH_M 100.0f

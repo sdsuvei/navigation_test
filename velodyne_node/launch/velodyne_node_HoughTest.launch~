@@ -15,14 +15,13 @@
   <include file="$(find velodyne_pointcloud)/launch/cloud_nodelet.launch">
     <arg name="calibration" value="$(arg calibration)"/>
 	<arg name="min_range" value="0.5" />
-	<arg name="max_range" value="100.0" />
+	<arg name="max_range" value="5.0" />
   </include>
 
 	<node pkg="velodyne_node" name="velodyne_node" type="velodyne_node" output="screen" >
 			<param name="ring" value="15" />
 			<param name="pointcloud_in" value="/velodyne_points" />
 			<param name="pointcloud_out" value="/pointcloud_out" />
-			<param name="my_num" type="int" value="40" />
 	</node>
 
 
@@ -31,6 +30,11 @@
 			<param name="in" value="/pointcloud_out" />
 			<param name="line_out" value="/2lines"/>
 			<param name="line_out1" value="/1lines"/>
+			<param name="min_row_distance" value="0.5" />
+			<param name="max_point_distance" value="5.0" />
+			<param name="angle_res" value="2" />
+			<param name="height" value="100" />
+			<param name="r_res" value="0.05" />
 	</node>
 
   

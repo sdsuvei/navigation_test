@@ -1,0 +1,6 @@
+<launch>	
+	<node type="human_awareness.py" name="human_awareness" pkg="human_awareness" respawn="true">
+
+	</node>
+
+</launch>

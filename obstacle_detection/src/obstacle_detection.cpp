@@ -1,5 +1,7 @@
 //#define PCL_NO_PRECOMPILE
 
+#define OLD_METHOD false
+
 #include <iostream>
 #include <sstream>
 #include <dirent.h>
@@ -72,6 +74,7 @@
 #include <pcl/common/centroid.h>
 #include <obstacle_detection/boundingbox.h>
 #include <obstacle_detection/boundingboxes.h>
+#include <std_msgs/Float64MultiArray.h>
 
 
 using namespace std;
@@ -89,10 +92,28 @@ void keyboardEventOccurred (const pcl::visualization::KeyboardEvent &event, void
 
 ros::Publisher* pubProcessedPointCloudPointer;
 ros::Subscriber* subRawPointCloudPointer;
+ros::Subscriber* sub2LinesPointer;
 ros::Publisher* pubOccupancyGridPointer;
 ros::Publisher* pubBBoxesPointer;
 pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudIn(new pcl::PointCloud<pcl::PointXYZI>());
+float theta, r1, r2;
+bool receivedHough = false;
 int n;
+
+void linesHandler(const std_msgs::Float64MultiArray& houghLines)
+{
+	theta = houghLines.data[0];
+	r1 = houghLines.data[1];
+	r2 = houghLines.data[2];
+
+	if (r2 < r1)
+	{
+		float tmp = r1;
+		r1 = r2;
+		r2 = tmp;
+	}
+	receivedHough = true;
+}
 
 void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 {
@@ -142,10 +163,49 @@ void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 	//	pcl::copyPointCloud(*cloudRGB,*cloudStat);
 	//	pcl::copyPointCloud(*cloudRGB,*planeDistCloud);
 
+
+	// Remove everything outside the two lines
+	pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_filtered(new pcl::PointCloud<pcl::PointXYZI>);
+	//pcl::copyPointCloud(*cloudRaw, *cloud_filtered);
+
+	// Rotation
+	float thetaZ = theta*PI/180; // The angle of rotation in radians
+	Eigen::Affine3f transform_2 = Eigen::Affine3f::Identity();
+	transform_2.rotate (Eigen::AngleAxisf (thetaZ, Eigen::Vector3f::UnitZ()));
+	pcl::PointCloud<pcl::PointXYZ>::Ptr transformed_cloud (new pcl::PointCloud<pcl::PointXYZ> ());
+	pcl::transformPointCloud (*cloudRaw, *cloud_filtered, transform_2);
+
+	// Passthrough
+	pcl::PassThrough<pcl::PointXYZI> passX;
+	passX.setInputCloud (cloud_filtered);
+	passX.setFilterFieldName ("x");
+	passX.setFilterLimits (-0.5, 100.0);
+	//pass.setFilterLimitsNegative (true);
+	passX.filter (*cloud_filtered);
+
+	pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filteredRGB(new pcl::PointCloud<pcl::PointXYZRGB>);
+	if (receivedHough)
+	{
+		pcl::PassThrough<pcl::PointXYZI> pass;
+		pass.setInputCloud (cloud_filtered);
+		pass.setFilterFieldName ("y");
+		pass.setFilterLimits (r1+WALL_CLEARANCE, r2-WALL_CLEARANCE);
+		//pass.setFilterLimitsNegative (true);
+		pass.filter (*cloud_filtered);
+	}
+
+	pcl::copyPointCloud(*cloud_filtered, *cloud_filteredRGB);
+	pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZRGB> color9(cloudRGB, 0, 0, 255);
+	viewer->addPointCloud<pcl::PointXYZRGB>(cloud_filteredRGB,color9,"LinesFiltered",viewP(LinesFiltered));
+	viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 2, "LinesFiltered");
+	viewer->addText ("LinesFiltered", 10, 10, fontsize, 1, 1, 1, "LinesFiltered text", viewP(LinesFiltered));
+
+
+
 	// Grid Minimum
 	pcl::PointCloud<pcl::PointXYZI>::Ptr gridCloud(new pcl::PointCloud<pcl::PointXYZI>);
 	pcl::GridMinimum<pcl::PointXYZI> gridm(1.0); // Set grid resolution
-	gridm.setInputCloud(cloudRaw);
+	gridm.setInputCloud(cloud_filtered);
 	gridm.filter(*gridCloud);
 
 	//*** Transform point cloud to adjust for a Ground Plane ***//
@@ -172,10 +232,11 @@ void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 	tf.rotate (Eigen::AngleAxisf (theta, u));
 	// Execute the transformation
 	pcl::PointCloud<pcl::PointXYZI>::Ptr transformedCloud (new pcl::PointCloud<pcl::PointXYZI> ());
-	pcl::transformPointCloud(*cloudRaw, *transformedCloud, tf);
+	pcl::transformPointCloud(*cloud_filtered, *transformedCloud, tf);
 
 
 	// Compute statistical moments for least significant direction in neighborhood
+#if (OLD_METHOD)
 	pcl::NeighborhoodFeatures<pcl::PointXYZI, AllFeatures> features;
 	pcl::PointCloud<AllFeatures>::Ptr featureCloud(new pcl::PointCloud<AllFeatures>);
 	features.setInputCloud(transformedCloud);
@@ -348,13 +409,32 @@ void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 		featureCloudAcc->clear();
 		labels.clear();
 
+#else
+
+		for (size_t i=0;i<transformedCloud->size();i++)
+		{
+			pcl::PointXYZI pTmp2 = transformedCloud->points[i];
+			pcl::PointXYZRGB pTmp;
+			pTmp.x = pTmp2.x;
+			pTmp.y = pTmp2.y;
+			pTmp.z = pTmp2.z;
+			pTmp.r = 255;
+			pTmp.g = 255;
+			if (pTmp.z > 0.1) // Object
+			{
+				classificationCloud->push_back(pTmp);
+			}
+		}
+
+
+#endif
 
 
 
 
 
 		// REGION GROWING
-		ROS_INFO("region growing 5");
+		//ROS_INFO("region growing 5");
 		pcl::PointCloud <pcl::PointXYZRGB>::Ptr objectCloud(new pcl::PointCloud<pcl::PointXYZRGB>);
 		//pcl::PointCloud <pcl::PointXYZRGB>::Ptr cloud (new pcl::PointCloud <pcl::PointXYZRGB>);
 
@@ -375,19 +455,19 @@ void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 		reg.setSearchMethod (tree);
 		//reg.setDistanceThreshold (0.0001f);
 		//reg.setResidualThreshold(0.01f);
-		ROS_INFO("res = %f",reg.getSmoothnessThreshold());
+		//ROS_INFO("res = %f",reg.getSmoothnessThreshold());
 		//reg.setPointColorThreshold (6);
 		//reg.setRegionColorThreshold (5);
 		reg.setMinClusterSize (1);
-		reg.setResidualThreshold(0.3f);
+		reg.setResidualThreshold(0.2f);
 		reg.setCurvatureTestFlag(false);
-//		reg.setResidualTestFlag(true);
-//		reg.setNormalTestFlag(false);
-//		reg.setSmoothModeFlag(false);
+		//		reg.setResidualTestFlag(true);
+		//		reg.setNormalTestFlag(false);
+		//		reg.setSmoothModeFlag(false);
 		std::vector <pcl::PointIndices> clusters;
 		reg.extract (clusters);
 
-		ROS_INFO("clusters = %d", clusters.size());
+		//ROS_INFO("clusters = %d", clusters.size());
 
 		//std::cout << "testefter" << std::endl;
 
@@ -469,7 +549,7 @@ void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 
 
 
-				// Compute principal directions
+		// Compute principal directions
 		//		Eigen::Vector4f pcaCentroid;
 		//		pcl::compute3DCentroid(*clustersFilteredCloud, pcaCentroid);
 		//		Eigen::Matrix3f covariance;
@@ -527,178 +607,178 @@ void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 		//	viewer->addPointCloud<pcl::PointXYZRGB>(featureCloudTrain,colorTTF2,"TestTrainFeatures2",viewP(TestTrainFeatures));
 		//	viewer->addText ("TestTrainFeatures", 10, 10, "TestTrainFeatures text", viewP(TestTrainFeatures));
 
-		sensor_msgs::PointCloud2 processedCloud;
-		pcl::toROSMsg(*classificationCloud, processedCloud);
-		processedCloud.header.stamp = ros::Time::now();//processedCloud->header.stamp;
-		processedCloud.header.frame_id = "/velodyne";
-		pubProcessedPointCloudPointer->publish(processedCloud);
-
-		pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud2D(new pcl::PointCloud<pcl::PointXYZRGB>);
-		pcl::PointCloud<pcl::PointXYZRGB>::Ptr objectCloud2D(new pcl::PointCloud<pcl::PointXYZRGB>);
-
-		for (size_t i=0;i<classificationCloud->size();i++)
-		{
-			pcl::PointXYZRGB pTmp = classificationCloud->points[i];
-			pTmp.z = 0; // 3D -> 2D
-			if ((pTmp.r == 255) || (pTmp.g == 255)) // Object
-			{
-				objectCloud2D->push_back(pTmp);
-			}
-			else if (pTmp.b == 255) // Object
-			{
-				groundCloud2D->push_back(pTmp);
-			}
-		}
-
-		//std::vector<int> indexVector;
-		unsigned int leafNodeCounter = 0;
-		unsigned int voxelDensity = 0;
-		unsigned int totalPoints = 0;
-		//int occupancyW = OCCUPANCY_WIDTH/OCCUPANCY_GRID_RESOLUTION;
-		//int occupancyH = OCCUPANCY_DEPTH/OCCUPANCY_GRID_RESOLUTION;
-		std::vector<unsigned int> ocGroundGrid(OCCUPANCY_WIDTH*OCCUPANCY_DEPTH, 0);
-		std::vector<unsigned int> ocObjectGrid(OCCUPANCY_WIDTH*OCCUPANCY_DEPTH, 0);
-		std::vector<signed char> ocGridFinal(OCCUPANCY_WIDTH*OCCUPANCY_DEPTH,-1);
-
-		// Ground grid
-		pcl::octree::OctreePointCloudDensity< pcl::PointXYZRGB > octreeGround (OCCUPANCY_GRID_RESOLUTION);
-		octreeGround.setInputCloud (groundCloud2D);
-		pcl::PointXYZ bot(-OCCUPANCY_DEPTH_M/2,-OCCUPANCY_WIDTH_M/2,-0.5);
-		pcl::PointXYZ top(OCCUPANCY_DEPTH_M/2,OCCUPANCY_WIDTH_M/2,0.5);
-		octreeGround.defineBoundingBox(bot.x, bot.y, bot.z, top.x, top.y, top.z);    // I have already calculated the BBox of my point cloud
-		octreeGround.addPointsFromInputCloud ();
-		pcl::octree::OctreePointCloudDensity<pcl::PointXYZRGB>::LeafNodeIterator it1;
-		pcl::octree::OctreePointCloudDensity<pcl::PointXYZRGB>::LeafNodeIterator it1_end = octreeGround.leaf_end();
-		int minx = 1000;
-		int miny = 1000;
-		int maxx = -1000;
-		int maxy = -1000;
-		for (it1 = octreeGround.leaf_begin(); it1 != it1_end; ++it1)
-		{
-			pcl::octree::OctreePointCloudDensityContainer& container = it1.getLeafContainer();
-			voxelDensity = container.getPointCounter();
-			Eigen::Vector3f min_pt, max_pt;
-			octreeGround.getVoxelBounds (it1, min_pt, max_pt);
-			//ROS_INFO("x = %f, y = %f, z = %f, x2 = %f, y2 = %f, z2 = %f",min_pt[0],min_pt[1],min_pt[2],max_pt[0],max_pt[1],max_pt[2]);
-			totalPoints += voxelDensity;
-			if (min_pt[0] < minx)
-				minx = min_pt[0];
-			if (min_pt[0] > maxx)
-				maxx = min_pt[0];
-			if (min_pt[1] < miny)
-				miny = min_pt[1];
-			if (min_pt[1] > maxy)
-				maxy = min_pt[1];
-
-			int r = OCCUPANCY_DEPTH-(min_pt[0]+OCCUPANCY_DEPTH_M/2)/OCCUPANCY_GRID_RESOLUTION;
-			int c = OCCUPANCY_WIDTH-(min_pt[1]+OCCUPANCY_WIDTH_M/2)/OCCUPANCY_GRID_RESOLUTION;
-
-			//			if ((r == 51) || (c==51))
-			//				ROS_INFO("r = %i,c = %i",r,c);
-
-			//if (((int)min_pt[0] == -1) || ((int)min_pt[1]==-1))
-			//ROS_INFO("min_pt[0] = %f, min_pt[1]=%f",min_pt[0],min_pt[1]);
-			if (!((r < 0) || (c < 0) || (r > OCCUPANCY_DEPTH-1) || (c > OCCUPANCY_WIDTH-1)))
-				ocGroundGrid[r+OCCUPANCY_DEPTH*c] = voxelDensity;
-			//ROS_INFO("density = %i, r = %i, c=%i",voxelDensity, r, c);
-			//ROS_INFO("x (%f) -> r (%i), y (%f) -> c (%i)",min_pt[0],r,min_pt[1],c);
-			leafNodeCounter++;
-		}
-
-
-		// Object grid
-		pcl::octree::OctreePointCloudDensity< pcl::PointXYZRGB > octreeObject (OCCUPANCY_GRID_RESOLUTION);
-		octreeObject.setInputCloud (objectCloud2D);
-		octreeObject.defineBoundingBox(bot.x, bot.y, bot.z, top.x, top.y, top.z);    // I have already calculated the BBox of my point cloud
-		octreeObject.addPointsFromInputCloud ();
-		pcl::octree::OctreePointCloudDensity<pcl::PointXYZRGB>::LeafNodeIterator it2;
-		pcl::octree::OctreePointCloudDensity<pcl::PointXYZRGB>::LeafNodeIterator it2_end = octreeObject.leaf_end();
-		minx = 1000;
-		miny = 1000;
-		maxx = -1000;
-		maxy = -1000;
-		leafNodeCounter = 0;
-		voxelDensity = 0;
-		totalPoints = 0;
-		int t1 = 0;
-		int t2 = 0;
-		int t3 = 0;
-		for (it2 = octreeObject.leaf_begin(); it2 != it2_end; ++it2)
-		{
-			pcl::octree::OctreePointCloudDensityContainer& container = it2.getLeafContainer();
-			voxelDensity = container.getPointCounter();
-			Eigen::Vector3f min_pt, max_pt;
-			octreeObject.getVoxelBounds (it2, min_pt, max_pt);
-			//ROS_INFO("x = %f, y = %f, z = %f, x2 = %f, y2 = %f, z2 = %f",min_pt[0],min_pt[1],min_pt[2],max_pt[0],max_pt[1],max_pt[2]);
-			totalPoints += voxelDensity;
-			if (min_pt[0] < minx)
-				minx = min_pt[0];
-			if (min_pt[0] > maxx)
-				maxx = min_pt[0];
-			if (min_pt[1] < miny)
-				miny = min_pt[1];
-			if (min_pt[1] > maxy)
-				maxy = min_pt[1];
-
-			int r = OCCUPANCY_DEPTH-(min_pt[0]+OCCUPANCY_DEPTH_M/2)/OCCUPANCY_GRID_RESOLUTION;
-			int c = OCCUPANCY_WIDTH-(min_pt[1]+OCCUPANCY_WIDTH_M/2)/OCCUPANCY_GRID_RESOLUTION;
-			if (!((r < 0) || (c < 0) || (r > OCCUPANCY_DEPTH-1) || (c > OCCUPANCY_WIDTH-1)))
-				ocObjectGrid[r+OCCUPANCY_DEPTH*c] = voxelDensity;
-			//ROS_INFO("object points = %i -> %i: x (%f) -> r (%i), y (%f) -> c (%i)",voxelDensity,ocGridFinal[r+OCCUPANCY_DEPTH*c],min_pt[0],r,min_pt[1],c);
-			//ocGrid[r+OCCUPANCY_DEPTH*c] = voxelDensity;
-			//ROS_INFO("density = %i, r = %i, c=%i",voxelDensity, r, c);
-
-			leafNodeCounter++;
-		}
-
-		for (int r=0;r<OCCUPANCY_DEPTH;r++)
-		{
-			for (int c=0;c<OCCUPANCY_WIDTH;c++)
-			{
-				if ((ocGroundGrid[r+OCCUPANCY_DEPTH*c] == 0) && (ocObjectGrid[r+OCCUPANCY_DEPTH*c] <= 1))
-				{
-					ocGridFinal[r+OCCUPANCY_DEPTH*c] = -1.0; // 0.5 default likelihood
-					t1++;
-				}
-				else if ((ocObjectGrid[r+OCCUPANCY_DEPTH*c] == 0))// && (ocGroundGrid[r+OCCUPANCY_DEPTH*c] > 0))
-				{
-					ocGridFinal[r+OCCUPANCY_DEPTH*c] = OCCUPANCY_MIN_PROB;
-					t2++;
-				}
-				else
-				{
-					ocGridFinal[r+OCCUPANCY_DEPTH*c] = 50+(OCCUPANCY_MAX_PROB-50)*ocObjectGrid[r+OCCUPANCY_DEPTH*c]/(ocObjectGrid[r+OCCUPANCY_DEPTH*c]+ocGroundGrid[r+OCCUPANCY_DEPTH*c]);
-					t3++;
-				}
-			}
-		}
-
-		nav_msgs::OccupancyGrid occupancyGrid;
-		occupancyGrid.info.resolution = OCCUPANCY_GRID_RESOLUTION;
-		occupancyGrid.header.stamp = timestamp;//ros::Time::now();
-		occupancyGrid.header.frame_id = "/velodyne";
-		occupancyGrid.info.width = OCCUPANCY_WIDTH;
-		occupancyGrid.info.height = OCCUPANCY_DEPTH;
-		//geometry_msgs::Pose lidarPose;
-		geometry_msgs::Point lidarPoint;
-		lidarPoint.x = 0;
-		lidarPoint.y = 0;
-		lidarPoint.z = 0;
-		geometry_msgs::Quaternion lidarQuaternion;
-		lidarQuaternion.w = 1;
-		lidarQuaternion.x = 0;
-		lidarQuaternion.y = 0;
-		lidarQuaternion.z = 0;
-		occupancyGrid.info.origin.position = lidarPoint;
-		occupancyGrid.info.origin.orientation = lidarQuaternion;
-		occupancyGrid.data = ocGridFinal;
-
-		//ROS_INFO("total points = %i, total leaves = %i",totalPoints,leafNodeCounter);
-		//ROS_INFO("minx = %i, maxx = %i, miny = %i, maxy = %i",minx,maxx,miny,maxy);
-		//ROS_INFO("t1 = %i, t2 = %i, t3 = %i",t1,t2,t3);
-
-
-		pubOccupancyGridPointer->publish(occupancyGrid);
+		//		sensor_msgs::PointCloud2 processedCloud;
+		//		pcl::toROSMsg(*classificationCloud, processedCloud);
+		//		processedCloud.header.stamp = ros::Time::now();//processedCloud->header.stamp;
+		//		processedCloud.header.frame_id = "/velodyne";
+		//		pubProcessedPointCloudPointer->publish(processedCloud);
+		//
+		//		pcl::PointCloud<pcl::PointXYZRGB>::Ptr groundCloud2D(new pcl::PointCloud<pcl::PointXYZRGB>);
+		//		pcl::PointCloud<pcl::PointXYZRGB>::Ptr objectCloud2D(new pcl::PointCloud<pcl::PointXYZRGB>);
+		//
+		//		for (size_t i=0;i<classificationCloud->size();i++)
+		//		{
+		//			pcl::PointXYZRGB pTmp = classificationCloud->points[i];
+		//			pTmp.z = 0; // 3D -> 2D
+		//			if ((pTmp.r == 255) || (pTmp.g == 255)) // Object
+		//			{
+		//				objectCloud2D->push_back(pTmp);
+		//			}
+		//			else if (pTmp.b == 255) // Object
+		//			{
+		//				groundCloud2D->push_back(pTmp);
+		//			}
+		//		}
+		//
+		//		//std::vector<int> indexVector;
+		//		unsigned int leafNodeCounter = 0;
+		//		unsigned int voxelDensity = 0;
+		//		unsigned int totalPoints = 0;
+		//		//int occupancyW = OCCUPANCY_WIDTH/OCCUPANCY_GRID_RESOLUTION;
+		//		//int occupancyH = OCCUPANCY_DEPTH/OCCUPANCY_GRID_RESOLUTION;
+		//		std::vector<unsigned int> ocGroundGrid(OCCUPANCY_WIDTH*OCCUPANCY_DEPTH, 0);
+		//		std::vector<unsigned int> ocObjectGrid(OCCUPANCY_WIDTH*OCCUPANCY_DEPTH, 0);
+		//		std::vector<signed char> ocGridFinal(OCCUPANCY_WIDTH*OCCUPANCY_DEPTH,-1);
+		//
+		//		// Ground grid
+		//		pcl::octree::OctreePointCloudDensity< pcl::PointXYZRGB > octreeGround (OCCUPANCY_GRID_RESOLUTION);
+		//		octreeGround.setInputCloud (groundCloud2D);
+		//		pcl::PointXYZ bot(-OCCUPANCY_DEPTH_M/2,-OCCUPANCY_WIDTH_M/2,-0.5);
+		//		pcl::PointXYZ top(OCCUPANCY_DEPTH_M/2,OCCUPANCY_WIDTH_M/2,0.5);
+		//		octreeGround.defineBoundingBox(bot.x, bot.y, bot.z, top.x, top.y, top.z);    // I have already calculated the BBox of my point cloud
+		//		octreeGround.addPointsFromInputCloud ();
+		//		pcl::octree::OctreePointCloudDensity<pcl::PointXYZRGB>::LeafNodeIterator it1;
+		//		pcl::octree::OctreePointCloudDensity<pcl::PointXYZRGB>::LeafNodeIterator it1_end = octreeGround.leaf_end();
+		//		int minx = 1000;
+		//		int miny = 1000;
+		//		int maxx = -1000;
+		//		int maxy = -1000;
+		//		for (it1 = octreeGround.leaf_begin(); it1 != it1_end; ++it1)
+		//		{
+		//			pcl::octree::OctreePointCloudDensityContainer& container = it1.getLeafContainer();
+		//			voxelDensity = container.getPointCounter();
+		//			Eigen::Vector3f min_pt, max_pt;
+		//			octreeGround.getVoxelBounds (it1, min_pt, max_pt);
+		//			//ROS_INFO("x = %f, y = %f, z = %f, x2 = %f, y2 = %f, z2 = %f",min_pt[0],min_pt[1],min_pt[2],max_pt[0],max_pt[1],max_pt[2]);
+		//			totalPoints += voxelDensity;
+		//			if (min_pt[0] < minx)
+		//				minx = min_pt[0];
+		//			if (min_pt[0] > maxx)
+		//				maxx = min_pt[0];
+		//			if (min_pt[1] < miny)
+		//				miny = min_pt[1];
+		//			if (min_pt[1] > maxy)
+		//				maxy = min_pt[1];
+		//
+		//			int r = OCCUPANCY_DEPTH-(min_pt[0]+OCCUPANCY_DEPTH_M/2)/OCCUPANCY_GRID_RESOLUTION;
+		//			int c = OCCUPANCY_WIDTH-(min_pt[1]+OCCUPANCY_WIDTH_M/2)/OCCUPANCY_GRID_RESOLUTION;
+		//
+		//			//			if ((r == 51) || (c==51))
+		//			//				ROS_INFO("r = %i,c = %i",r,c);
+		//
+		//			//if (((int)min_pt[0] == -1) || ((int)min_pt[1]==-1))
+		//			//ROS_INFO("min_pt[0] = %f, min_pt[1]=%f",min_pt[0],min_pt[1]);
+		//			if (!((r < 0) || (c < 0) || (r > OCCUPANCY_DEPTH-1) || (c > OCCUPANCY_WIDTH-1)))
+		//				ocGroundGrid[r+OCCUPANCY_DEPTH*c] = voxelDensity;
+		//			//ROS_INFO("density = %i, r = %i, c=%i",voxelDensity, r, c);
+		//			//ROS_INFO("x (%f) -> r (%i), y (%f) -> c (%i)",min_pt[0],r,min_pt[1],c);
+		//			leafNodeCounter++;
+		//		}
+		//
+		//
+		//		// Object grid
+		//		pcl::octree::OctreePointCloudDensity< pcl::PointXYZRGB > octreeObject (OCCUPANCY_GRID_RESOLUTION);
+		//		octreeObject.setInputCloud (objectCloud2D);
+		//		octreeObject.defineBoundingBox(bot.x, bot.y, bot.z, top.x, top.y, top.z);    // I have already calculated the BBox of my point cloud
+		//		octreeObject.addPointsFromInputCloud ();
+		//		pcl::octree::OctreePointCloudDensity<pcl::PointXYZRGB>::LeafNodeIterator it2;
+		//		pcl::octree::OctreePointCloudDensity<pcl::PointXYZRGB>::LeafNodeIterator it2_end = octreeObject.leaf_end();
+		//		minx = 1000;
+		//		miny = 1000;
+		//		maxx = -1000;
+		//		maxy = -1000;
+		//		leafNodeCounter = 0;
+		//		voxelDensity = 0;
+		//		totalPoints = 0;
+		//		int t1 = 0;
+		//		int t2 = 0;
+		//		int t3 = 0;
+		//		for (it2 = octreeObject.leaf_begin(); it2 != it2_end; ++it2)
+		//		{
+		//			pcl::octree::OctreePointCloudDensityContainer& container = it2.getLeafContainer();
+		//			voxelDensity = container.getPointCounter();
+		//			Eigen::Vector3f min_pt, max_pt;
+		//			octreeObject.getVoxelBounds (it2, min_pt, max_pt);
+		//			//ROS_INFO("x = %f, y = %f, z = %f, x2 = %f, y2 = %f, z2 = %f",min_pt[0],min_pt[1],min_pt[2],max_pt[0],max_pt[1],max_pt[2]);
+		//			totalPoints += voxelDensity;
+		//			if (min_pt[0] < minx)
+		//				minx = min_pt[0];
+		//			if (min_pt[0] > maxx)
+		//				maxx = min_pt[0];
+		//			if (min_pt[1] < miny)
+		//				miny = min_pt[1];
+		//			if (min_pt[1] > maxy)
+		//				maxy = min_pt[1];
+		//
+		//			int r = OCCUPANCY_DEPTH-(min_pt[0]+OCCUPANCY_DEPTH_M/2)/OCCUPANCY_GRID_RESOLUTION;
+		//			int c = OCCUPANCY_WIDTH-(min_pt[1]+OCCUPANCY_WIDTH_M/2)/OCCUPANCY_GRID_RESOLUTION;
+		//			if (!((r < 0) || (c < 0) || (r > OCCUPANCY_DEPTH-1) || (c > OCCUPANCY_WIDTH-1)))
+		//				ocObjectGrid[r+OCCUPANCY_DEPTH*c] = voxelDensity;
+		//			//ROS_INFO("object points = %i -> %i: x (%f) -> r (%i), y (%f) -> c (%i)",voxelDensity,ocGridFinal[r+OCCUPANCY_DEPTH*c],min_pt[0],r,min_pt[1],c);
+		//			//ocGrid[r+OCCUPANCY_DEPTH*c] = voxelDensity;
+		//			//ROS_INFO("density = %i, r = %i, c=%i",voxelDensity, r, c);
+		//
+		//			leafNodeCounter++;
+		//		}
+		//
+		//		for (int r=0;r<OCCUPANCY_DEPTH;r++)
+		//		{
+		//			for (int c=0;c<OCCUPANCY_WIDTH;c++)
+		//			{
+		//				if ((ocGroundGrid[r+OCCUPANCY_DEPTH*c] == 0) && (ocObjectGrid[r+OCCUPANCY_DEPTH*c] <= 1))
+		//				{
+		//					ocGridFinal[r+OCCUPANCY_DEPTH*c] = -1.0; // 0.5 default likelihood
+		//					t1++;
+		//				}
+		//				else if ((ocObjectGrid[r+OCCUPANCY_DEPTH*c] == 0))// && (ocGroundGrid[r+OCCUPANCY_DEPTH*c] > 0))
+		//				{
+		//					ocGridFinal[r+OCCUPANCY_DEPTH*c] = OCCUPANCY_MIN_PROB;
+		//					t2++;
+		//				}
+		//				else
+		//				{
+		//					ocGridFinal[r+OCCUPANCY_DEPTH*c] = 50+(OCCUPANCY_MAX_PROB-50)*ocObjectGrid[r+OCCUPANCY_DEPTH*c]/(ocObjectGrid[r+OCCUPANCY_DEPTH*c]+ocGroundGrid[r+OCCUPANCY_DEPTH*c]);
+		//					t3++;
+		//				}
+		//			}
+		//		}
+		//
+		//		nav_msgs::OccupancyGrid occupancyGrid;
+		//		occupancyGrid.info.resolution = OCCUPANCY_GRID_RESOLUTION;
+		//		occupancyGrid.header.stamp = timestamp;//ros::Time::now();
+		//		occupancyGrid.header.frame_id = "/velodyne";
+		//		occupancyGrid.info.width = OCCUPANCY_WIDTH;
+		//		occupancyGrid.info.height = OCCUPANCY_DEPTH;
+		//		//geometry_msgs::Pose lidarPose;
+		//		geometry_msgs::Point lidarPoint;
+		//		lidarPoint.x = 0;
+		//		lidarPoint.y = 0;
+		//		lidarPoint.z = 0;
+		//		geometry_msgs::Quaternion lidarQuaternion;
+		//		lidarQuaternion.w = 1;
+		//		lidarQuaternion.x = 0;
+		//		lidarQuaternion.y = 0;
+		//		lidarQuaternion.z = 0;
+		//		occupancyGrid.info.origin.position = lidarPoint;
+		//		occupancyGrid.info.origin.orientation = lidarQuaternion;
+		//		occupancyGrid.data = ocGridFinal;
+		//
+		//		//ROS_INFO("total points = %i, total leaves = %i",totalPoints,leafNodeCounter);
+		//		//ROS_INFO("minx = %i, maxx = %i, miny = %i, maxy = %i",minx,maxx,miny,maxy);
+		//		//ROS_INFO("t1 = %i, t2 = %i, t3 = %i",t1,t2,t3);
+		//
+		//
+		//		pubOccupancyGridPointer->publish(occupancyGrid);
 
 
 		//		int l = 0;
@@ -725,10 +805,11 @@ void rawCloudHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud)
 			//viewer->setCameraPosition(-20,0,10,1,0,2,1,0,2,v2);
 			viewer->loadCameraParameters("pcl_video.cam");
 		}
+#if (OLD_METHOD)
 	}
+#endif
 
-
-	viewer->spin();
+	viewer->spinOnce();
 
 	// Save screenshot
 	std::stringstream tmp;
@@ -750,6 +831,9 @@ main (int argc, char** argv)
 	ros::Subscriber subRawPointCloud = nh.subscribe<sensor_msgs::PointCloud2>
 	("/velodyne_points", 2, rawCloudHandler);
 
+	ros::Subscriber sub2Lines = nh.subscribe("/measHough", 2, linesHandler);
+
+
 	ros::Publisher pubOccupancyGrid = nh.advertise<nav_msgs::OccupancyGrid>
 	("/obstacle_detection/velodyne_evidence_grid", 1);
 
@@ -760,6 +844,7 @@ main (int argc, char** argv)
 	subRawPointCloudPointer = &subRawPointCloud;
 	pubOccupancyGridPointer = &pubOccupancyGrid;
 	pubBBoxesPointer = &pubBBoxes;
+	sub2LinesPointer = &sub2Lines;
 
 	// Set up PCL Viewer
 	viewer.reset (new pcl::visualization::PCLVisualizer (argc, argv, "PointCloud"));
@@ -767,17 +852,17 @@ main (int argc, char** argv)
 	//
 	//	// Create view ports
 	//	// 1 view port
-//	viewer->createViewPort(0.0,0.0,1.0,1.0,v2);
+	//	viewer->createViewPort(0.0,0.0,1.0,1.0,v2);
 
 	// 2 view ports
 	//viewer->createViewPort(0.0,0.0,0.5,1.0,v1);
 	//viewer->createViewPort(0.5,0.0,1.0,1.0,v2);
 
 	// 4 view ports
-		viewer->createViewPort (0.0, 0.5, 0.5, 1.0, v1);
-		viewer->createViewPort (0.5, 0.5, 1.0, 1.0, v2);
-		viewer->createViewPort (0.0, 0.0, 0.5, 0.5, v3);
-		viewer->createViewPort (0.5, 0.0, 1.0, 0.5, v4);
+	viewer->createViewPort (0.0, 0.5, 0.5, 1.0, v1);
+	viewer->createViewPort (0.5, 0.5, 1.0, 1.0, v2);
+	viewer->createViewPort (0.0, 0.0, 0.5, 0.5, v3);
+	viewer->createViewPort (0.5, 0.0, 1.0, 0.5, v4);
 
 
 	viewer->addCoordinateSystem(1.0);
