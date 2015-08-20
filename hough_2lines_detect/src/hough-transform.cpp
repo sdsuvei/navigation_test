@@ -34,6 +34,42 @@ HoughTransform::HoughTransform(){
 	max.t = 0;
 }
 
+Line HoughTransform::calcLine(double t, double r)
+{
+	double theta = fmod(t*DEG2RAD,2*PI);
+	Line line;
+	double X1,X2,Y1,Y2;
+	if (fabs(theta-PI/2) < 0.0001)
+	{
+		theta = PI/2+0.0001;
+		//ROS_INFO("0000");
+	}
+
+	if ((theta > PI/4 && theta < 3*PI/4) || (theta > 5*PI/4 && theta < 7*PI/4))
+	{
+		X1 = -10000;
+		Y1 = ((double)(r-(double)std::floor<int>(h/2))*RRESOLUTION - (double)X1  * cos(theta)) / sin(theta);
+		X2 = 10000;
+		Y2 = ((double)(r-(double)std::floor<int>(h/2))*RRESOLUTION - (double)X2  * cos(theta)) / sin(theta);
+		//ROS_INFO("oppe = %f, %f, %d, %f, %f, %f, %f",theta,r, h, Y1, (double)(r-(double)std::floor<int>(h/2))*RRESOLUTION, cos(t*tRes * DEG2RAD));
+
+	}
+	else
+	{
+		Y1 = -10000;
+		X1 = ((double)(r-(double)std::floor<int>(h/2))*RRESOLUTION - (double)Y1  * sin(theta)) / cos(theta);
+		Y2 = 10000;
+		X2 = ((double)(r-(double)std::floor<int>(h/2))*RRESOLUTION - (double)Y2  * sin(theta)) / cos(theta);
+		//ROS_INFO("nede");
+	}
+
+	line.x1 = X1;
+	line.y1 = Y1;
+	line.x2 = X2;
+	line.y2 = Y2;
+	return line;
+}
+
 OutputLines HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr & cloud_in, ros::Publisher* hough_img_){
 
 	OutputLines returnVal;
@@ -176,31 +212,33 @@ OutputLines HoughTransform::Transform2(const sensor_msgs::PointCloud::ConstPtr &
 	//ROS_INFO("t = %f, r = %f, minVal = %f, maxVal = %f, %d",max.t,max.r,minVal,maxVal, houghImg.at<uint16_t>(0,0));
 
 	// Handle the first line (found as the maximum of the Hough image)
-	y1 = -1000;
-	x1 = ((double)(max.r-(double)std::floor<int>(h/2))*RRESOLUTION - (double)y1  * sin(max.t*tRes * DEG2RAD)) / cos(max.t*tRes * DEG2RAD);
-	y2 = 1000;
-	x2 = ((double)(max.r-(double)std::floor<int>(h/2))*RRESOLUTION - (double)y2  * sin(max.t*tRes * DEG2RAD)) / cos(max.t*tRes * DEG2RAD);
 
-	Line line;
-	line.x1 = x1;
-	line.y1 = y1;
-	line.x2 = x2;
-	line.y2 = y2;
 
-	returnVal.line1 = line;
+//	y1 = -1000;
+//	x1 = ((double)(max.r-(double)std::floor<int>(h/2))*RRESOLUTION - (double)y1  * sin(max.t*tRes * DEG2RAD)) / cos(max.t*tRes * DEG2RAD);
+//	y2 = 1000;
+//	x2 = ((double)(max.r-(double)std::floor<int>(h/2))*RRESOLUTION - (double)y2  * sin(max.t*tRes * DEG2RAD)) / cos(max.t*tRes * DEG2RAD);
+//
+//	Line line;
+//	line.x1 = x1;
+//	line.y1 = y1;
+//	line.x2 = x2;
+//	line.y2 = y2;
+
+	returnVal.line1 = calcLine(max.t, max.r);//line;
 
 	// Handle the second line (found as the next maximum along the column)
-	y1 = -1000;
-	x1 = ((double)(max.r_second-(double)std::floor<int>(h/2))*RRESOLUTION - (double)y1  * sin(max.t*tRes * DEG2RAD)) / cos(max.t*tRes * DEG2RAD);
-	y2 = 1000;
-	x2 = ((double)(max.r_second-(double)std::floor<int>(h/2))*RRESOLUTION - (double)y2  * sin(max.t*tRes * DEG2RAD)) / cos(max.t*tRes * DEG2RAD);
+//	y1 = -1000;
+//	x1 = ((double)(max.r_second-(double)std::floor<int>(h/2))*RRESOLUTION - (double)y1  * sin(max.t*tRes * DEG2RAD)) / cos(max.t*tRes * DEG2RAD);
+//	y2 = 1000;
+//	x2 = ((double)(max.r_second-(double)std::floor<int>(h/2))*RRESOLUTION - (double)y2  * sin(max.t*tRes * DEG2RAD)) / cos(max.t*tRes * DEG2RAD);
+//
+//	line.x1 = x1;
+//	line.y1 = y1;
+//	line.x2 = x2;
+//	line.y2 = y2;
 
-	line.x1 = x1;
-	line.y1 = y1;
-	line.x2 = x2;
-	line.y2 = y2;
-
-	returnVal.line2 = line;
+	returnVal.line2 = calcLine(max.t, max.r_second);//line;
 
 
 	returnVal.theta = 90-max.t*tRes;

@@ -86,6 +86,8 @@ Frobit::Frobit(){
 	deadman_button.data = false;
 	z_axis = 0;
 	x_axis = 0;
+        v_max = 0.3;
+        d_max = 4;
 
 	//subScan = n.subscribe("/fmSensors/scan", 1000, &Frobit::scanCallback, this);
 	sub_lines = n.subscribe("/measHough", 5, &Frobit::updateVel,this);
@@ -97,48 +99,52 @@ Frobit::Frobit(){
 
 void Frobit::updateVel(const std_msgs::Float64MultiArray& houghInfo){
 // called every 0.1 sec to publish cmd_vel
-//	time stamp of message
-//	std::cout<<"Hey"<<std::endl;
 	twist.header.stamp = ros::Time::now();
 	twist.twist.angular.z = z_axis;
-	// check for collision
-	//if(stopCounter >= 5){
-		//std::cout << "HIT THE WALL\t TURNING AROUND\n";
-		//twist.twist.linear.x = 0.0; // stop motors
-		
-		//if(angelTurned < 180){//related to IMU --- needs to be checked
-		//	twist.twist.angular.z = 1.0;
-		//} else {
-		//std::cout<<"HoughInfo:"<<houghInfo<<std::endl;
-		//std::cout<<"z_axis:"<<z_axis<<std::endl;
-	        float r1_ = houghInfo.data[1];
-		float r2_ = houghInfo.data[2];
-		//std::cout<<"r1 = "<<r1_<< " and r2 = "<< r2_<<std::endl;
-		float dist_ = r1_+r2_;  
-		float center_range = fabs(r1_)+fabs(r2_);  
-		//std::cout<<"dist = "<<dist_<< " and center = "<< center_range<<std::endl;
-bool temp;
-		if(fabs(dist_)>center_range/7)
-		{
-temp =true;
-			twist.twist.angular.z = 0.2*dist_;
-		}		
-		else
-		{
-temp = false;
-			twist.twist.angular.z = -houghInfo.data[0]*0.4*.017453293;
-			//Maybe reset stopCounter after turning
-			stopCounter = 0;
-			followLeftWall = false;
-		}
-//std::cout<<"HoughInfo.data[0]:"<<houghInfo.data[0] << " is it the if case? " << temp<<std::endl;
-//std::cout << "The total dist is : " << fabs(dist_) << " > " << center_range/7 << "! Is it ? " << temp << std::endl;
-			
-		//}
-	//} else {
-		//twist.twist.linear.x = 0.2; //constant speed
-	//}	
-	twist.twist.linear.x = 0.2; //constant speed
+
+	// Get values from the hough2line node (theta,r1,r2)
+	float theta = houghInfo.data[0];
+	float r1_ = houghInfo.data[1];
+	float r2_ = houghInfo.data[2];
+
+	// compute distances to the two lines and the desired "center lane"
+	float r_dist_ = r1_+r2_;  
+	float center_range = fabs(r1_)+fabs(r2_);  
+	
+	double err_ = 0;
+	// compute the angle error	
+	if(fabs(r_dist_)>center_range/7)
+	{
+		err_ = 0.35*r_dist_;
+	}
+	
+	twist.twist.angular.z = -0.4*theta*DEG2RAD+err_;
+	// compute the angle error	
+	/*if(fabs(r_dist_)>center_range/7)
+	{
+		twist.twist.angular.z = 0.2*r_dist_;
+	}		
+	else
+	{
+		twist.twist.angular.z = -theta*0.4*.017453293;
+	}*/
+	
+	// handle the velocity, in case robot is running close to an obstacle 
+	float R=std::min(fabs(r1_),fabs(r2_)); //smallest r distance
+	
+	// determine the frontal distance to the obstacle	
+	float phi = fabs(90-fabs(theta))*DEG2RAD;
+	float front_dist_ = R/cos(phi);
+	
+	// change the velocity
+	twist.twist.linear.x = std::min((float)fabs(front_dist_/d_max), 1.0f)*v_max;	
+
+	std::cout << "theta: "<< theta <<  " and phi: = " << phi << std::endl;
+	std::cout << "err: "<< err_ << std::endl;
+	std::cout << "r1: "<< r1_ <<  " and r2: = " << r2_ << std::endl;
+	std::cout << "R: "<< R << std::endl;
+	std::cout << front_dist_ <<  " and division = " << front_dist_/d_max << std::endl;
+	//twist.twist.linear.x = 0.2; //constant speed
 	// send command to motors
 	twist_pub_.publish(twist);
 	//deadman_button.data = true;	

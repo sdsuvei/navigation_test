@@ -11,11 +11,12 @@
 #include <msgs/nmea.h>
 #include <fstream>
 #include <math.h>
+#include <algorithm>  
 #include <stdlib.h>
 #include <std_msgs/Float64MultiArray.h>
 
 #define M_PI2   2*M_PI
-#define DEG2RAD 0.0174533
+#define DEG2RAD 0.0174533f
 
 //create PID controller
 struct PID {
@@ -124,6 +125,9 @@ private:
 	std_msgs::Float64 error_msg; //Error message
 	double z_axis; 
 	double x_axis;
+        float v_max;
+        float d_max;
+
 	geometry_msgs::TwistStamped twist;
 	ros::Subscriber sub;
 	ros::Subscriber subScan;

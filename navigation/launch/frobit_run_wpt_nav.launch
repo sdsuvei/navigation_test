@@ -180,27 +180,30 @@ RoboCard based frobits using 1800/700 ohm voltage dividers:
 	</node>
   
 	<node pkg="hough_2lines_detect" name="hough_2lines_detect" type="hough_2lines_detect" output="screen" >
-			<param name="in" value="/pointcloud_out" />
-			<param name="line_out" value="/2lines"/>
-			<param name="line_out1" value="/1lines"/>
-			<param name="min_row_distance" value="0.5" />
-			<param name="max_point_distance" value="2.0" />
-			<param name="angle_res" value="1" />
-			<param name="height" value="50" />
-			<param name="r_res" value="0.05" />
+		<param name="in" value="/pointcloud_out" />
+		<param name="line_out" value="/2lines"/>
+		<param name="line_out1" value="/1lines"/>
+		<param name="min_row_distance" value="0.5" />
+		<param name="max_point_distance" value="4.0" />
+		<param name="angle_res" value="1" />
+		<param name="height" value="100" />
+		<param name="r_res" value="0.05" />
 	</node>
 
-		<node pkg="navigation" type="navigation" name="navigation" output="screen">
-			<!--param name="automode_pub" value="/fmDecision/automode" /-->
-	    		<param name="deadman_pub" value="/fmCommand/deadman" />
-			<param name="cmd_vel_pub" value="/cmd_vel2" />
-			<param name="sub_lines" value="/measHough" />
-		    <param name="max_linear_velocity" value="50.7"/>
-		    <param name="max_angular_velocity" value="50.5"/>
-		    <param name="linear_velocity_step" value="0.1"/>
-		    <param name="angular_velocity_step" value="0.2"/>
-		</node> 
+	<node pkg="navigation" type="navigation" name="navigation" output="screen">
+		<!--param name="automode_pub" value="/fmDecision/automode" /-->
+    		<param name="deadman_pub" value="/fmCommand/deadman" />
+		<param name="cmd_vel_pub" value="/cmd_vel2" />
+		<param name="sub_lines" value="/measHoughKalman" />
+		<param name="max_linear_velocity" value="50.7"/>
+		<param name="max_angular_velocity" value="50.5"/>
+		<param name="linear_velocity_step" value="0.1"/>
+		<param name="angular_velocity_step" value="0.2"/>
+	</node> 
 
+	<node type="kalman_filter.py" name="kalman_filter" pkg="kalman_filter_pkg" respawn="true">
+
+	</node>
 	
 
   

@@ -22,8 +22,9 @@
   <!-- start cloud nodelet -->
   <include file="$(find velodyne_pointcloud)/launch/cloud_nodelet.launch">
     <arg name="calibration" value="$(arg calibration)"/>
-	<arg name="min_range" value="0.5" />
+	<arg name="min_range" value="0.1" />
 	<arg name="max_range" value="100.0" />
+	
   </include>
 
 	<node pkg="velodyne_node" name="velodyne_node" type="velodyne_node" output="screen" >
@@ -31,5 +32,6 @@
 			<param name="pointcloud_in" value="/velodyne_points" />
 			<param name="pointcloud_out" value="/velodyne_1d_cloud" />
 	</node>
+
 
 </launch>
