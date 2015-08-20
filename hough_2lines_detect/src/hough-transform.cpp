@@ -36,7 +36,7 @@ HoughTransform::HoughTransform(){
 
 Line HoughTransform::calcLine(double t, double r)
 {
-	double theta = fmod(t*DEG2RAD,2*PI);
+	double theta = fmod(t*tRes*DEG2RAD,2*PI);
 	Line line;
 	double X1,X2,Y1,Y2;
 	if (fabs(theta-PI/2) < 0.0001)
