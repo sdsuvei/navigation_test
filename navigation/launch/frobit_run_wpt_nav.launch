@@ -195,6 +195,7 @@ RoboCard based frobits using 1800/700 ohm voltage dividers:
     		<param name="deadman_pub" value="/fmCommand/deadman" />
 		<param name="cmd_vel_pub" value="/cmd_vel2" />
 		<param name="sub_lines" value="/measHoughKalman" />
+		<param name="sub_BB" value="/obstacle_detection/boundingboxes" />
 		<param name="max_linear_velocity" value="50.7"/>
 		<param name="max_angular_velocity" value="50.5"/>
 		<param name="linear_velocity_step" value="0.1"/>
