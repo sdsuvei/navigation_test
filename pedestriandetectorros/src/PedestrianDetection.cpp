@@ -98,7 +98,8 @@ public:
 		nh.param<std::string>("model_dir",model_dir,"model");
 		//ROS_ERROR("%s\n",model_dir.c_str());
 		cam_pub = it.advertiseCamera("imageWithBBox", 1);
-
+		//ROS_INFO("Estimating human distance using a camera height of %fm and angle of %fdegrees",cameraHeight,angleTiltDegrees);
+		//ROS_ERROR("Estimating human distance using a camera height of %fm and angle of %fdegrees",cameraHeight,angleTiltDegrees);
 		cinfor_ = boost::shared_ptr<camera_info_manager::CameraInfoManager>(
 				new camera_info_manager::CameraInfoManager(nh, "test", ""));
 
