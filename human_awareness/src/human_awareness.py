@@ -6,6 +6,7 @@ from collections import namedtuple
 from std_msgs.msg import Float64MultiArray
 from std_msgs.msg import UInt16
 
+
 distanceBoundary1 = 1
 distanceBoundary2 = 3
 distanceBoundary3 = 5

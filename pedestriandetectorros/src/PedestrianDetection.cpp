@@ -33,6 +33,7 @@
 #include <camera_info_manager/camera_info_manager.h>
 #include <cv_bridge/cv_bridge.h>
 #include <sensor_msgs/image_encodings.h>
+#include <visualization_msgs/Marker.h>
 
 using namespace std;
 using namespace cv;
@@ -105,6 +106,7 @@ public:
 
 		array_pub = nh.advertise<std_msgs::Float64MultiArray>("DistanceAngle", 1);
 		array_pub2 = nh.advertise<std_msgs::Float64MultiArray>("BBox", 1);
+		vis_pub = nh.advertise<visualization_msgs::Marker>( "/PedestrianMarker", 0 );
 		//cam_sub = it.subscribeCamera("image_raw", 1, &MyNode::onImage, this);
 		cam_sub = it.subscribeCamera("/usb_cam/image_raw", 1, &MyNode::onImage, this);
 		
@@ -175,6 +177,38 @@ public:
 			//bbMsg.data.push_back(bbs[iBbs].)
 		}
 
+		// Creating visual marker
+		visualization_msgs::Marker marker;
+		marker.header.frame_id = "/laser";
+		marker.header.stamp = ros::Time();
+		marker.ns = "my_namespace";
+		marker.id = 0;
+		marker.type = visualization_msgs::Marker::CYLINDER;
+		marker.action = visualization_msgs::Marker::ADD;
+		marker.pose.orientation.x = 0.0;
+		marker.pose.orientation.y = 0.0;
+		marker.pose.orientation.z = 0.0;
+		marker.pose.orientation.w = 1.0;
+		marker.scale.x = 1;
+		marker.scale.y = 1.0;
+		marker.scale.z = 2.0;
+		marker.color.a = 1.0; // Don't forget to set the alpha!
+		marker.color.r = 1.0;
+		marker.color.g = 0.0;
+		marker.color.b = 0.0;
+		marker.pose.position.x = 0;
+		marker.pose.position.y = 0;
+		marker.pose.position.z = 1;
+		
+		for (int iBbs = 0; iBbs < bbs.size(); ++iBbs) {
+			marker.pose.position.x = bbs[iBbs].distance*cos(bbs[iBbs].angle+3.14/2);
+			marker.pose.position.y = bbs[iBbs].distance*sin(bbs[iBbs].angle+3.14/2);
+			vis_pub.publish(marker);	
+		}
+		if(bbs.size() == 0) {
+			marker.color.a = 0.0;
+			vis_pub.publish(marker);	
+		}
 		cam_pub.publish(msg_out, cc);
 		array_pub.publish(bbMsg);
 		array_pub2.publish(bboxMsg);
@@ -193,6 +227,7 @@ private:
 	boost::shared_ptr<camera_info_manager::CameraInfoManager> cinfor_;
 	ros::Publisher array_pub;
 	ros::Publisher array_pub2;
+	ros::Publisher vis_pub;
 	PedestrianDetector* oPedDetector;
 
 };
